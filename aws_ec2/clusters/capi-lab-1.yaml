@@ -29,6 +29,12 @@ spec:
   controlPlaneLoadBalancer:
     healthCheckProtocol: HTTPS
     loadBalancerType: nlb
+  network:
+    vpc:
+      # Lab cost control: 1 AZ ⇒ 1 public + 1 private subnet ⇒ 1 NAT Gateway
+      # (CAPA default availabilityZoneUsageLimit is 3 ⇒ 3 NATs).
+      availabilityZoneUsageLimit: 1
+      availabilityZoneSelection: Ordered
   region: us-east-2
   sshKeyName: Lonny_EtcConsulting
 ---

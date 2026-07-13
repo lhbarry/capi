@@ -29,9 +29,21 @@ kubectl delete -f aws_ec2/clusters/<name>.yaml
 
 | Cluster | File | K8s | Region | Notes |
 |---------|------|-----|--------|-------|
-| `capi-lab-1` | `capi-lab-1.yaml` | v1.34.1 | us-east-2 | 1 CP + 1 worker, t3.large, key `Lonny_EtcConsulting` |
+| `capi-lab-1` | `capi-lab-1.yaml` | v1.34.1 | us-east-2 | 1 CP + 1 worker, t3.large, key `Lonny_EtcConsulting`, **1 AZ / 1 NAT** (`availabilityZoneUsageLimit: 1`) |
 
 Flux Kustomization **`flux-system/aws-ec2-clusters`** (defined under `clusters/capi-mgmt/aws-ec2-clusters.yaml`) syncs this directory to Kind. CAPA then provisions AWS.
+
+## Network / NAT (lab)
+
+Default CAPA managed VPC uses **3 AZs → 3 NAT Gateways** (expensive). This lab pins:
+
+```yaml
+# AWSCluster.spec.network.vpc
+availabilityZoneUsageLimit: 1
+availabilityZoneSelection: Ordered   # first AZ alphabetically in the region
+```
+
+That yields **1 public + 1 private subnet and a single NAT**. Changing this on an existing cluster does **not** shrink an already-provisioned VPC; recreate the cluster (delete `Cluster`, wait for AWS teardown, re-apply) to pick up a new layout.
 
 ## Workload addons (CNI / CCM)
 
