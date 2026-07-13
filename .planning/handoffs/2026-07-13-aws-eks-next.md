@@ -1,170 +1,184 @@
 # Handoff: CAPA lab → next session (`aws_eks` + IAM layout)
 
-**Date:** 2026-07-13  
-**Repo:** `lhbarry/capi` (`main` @ `12456c5`)  
-**Resume:** from this directory with `/pickup` or open this file.
+**Date:** 2026-07-13 (updated end of day)  
+**Repo:** `lhbarry/capi` (`main`)  
+**Resume:** open this file from `/home/lonny/Devel/Git/capi` (or `/pickup`).
 
 ---
 
-## Session goal completed (aws_ec2)
+## First task tomorrow (BLOCKING — decide at session start)
 
-Proved GitOps path:
+### Decide IAM CloudFormation layout before any EKS work
 
-```text
-GitHub (lhbarry/capi) → Flux on Kind (capi-mgmt) → CAPA → AWS EC2 workload cluster
-```
+**Do not** `clusterctl generate` / apply `aws_eks` cluster YAML until this is decided.
 
-Workload cluster `capi-lab-1` was brought up (v1.34.1, Calico + CCM), then **torn down**. AWS cluster resources are gone. Kind + Flux + CAPA controllers remain.
+#### Why this is first
 
----
+Current CAPA IAM is **one monolith** stack. It mixes common controller IAM, EC2 self-managed node/CP profiles, and EKS-specific bits. Next path is `aws_eks`; user wants a **decision** on cutting into **three templates** (common / ec2 / eks) vs keeping one stack.
 
-## First task tomorrow (BLOCKING DECISION)
+#### What’s in the monolith today (11 resources)
 
-### Decide IAM CloudFormation layout before EKS work
+| Bucket | Resources (`*.cluster-api-provider-aws.sigs.k8s.io`) | Needed for |
+|--------|------------------------------------------------------|------------|
+| **Common** | Role + policy (+ profile) **controllers** | Kind CAPA for both paths |
+| **EC2 self-managed** | **control-plane** + **nodes** (role, policy, instance profile) | `aws_ec2` kubeadm CAPA |
+| **EKS** | Role **eks-controlplane** + policy **controllers-eks** | `aws_eks` CAPA |
 
-**Do not generate/apply `aws_eks` cluster YAML until this is decided.**
+Stack name: `cluster-api-provider-aws-sigs-k8s-io`  
+Template: `aws_ec2/iam/cluster-api-provider-aws-sigs-k8s-io.yaml`  
+Live status: **CREATE_COMPLETE** · **$0** billable  
 
-#### Context
+#### Options (pick one)
 
-Current stack (monolith, still in account, **$0 bill**):
+1. **Split three stacks (proposed for teaching / boundaries)**  
+   - e.g. `aws_iam/common.yaml`, `aws_iam/ec2-self-managed.yaml`, `aws_iam/eks.yaml`  
+   - Deploy: always **common**; add **ec2** and/or **eks**  
+   - Cross-stack: attach `controllers-eks` → controllers role when EKS enabled  
+2. **Keep one CAPA stack** — reuse for both paths; unused IAM idle at $0  
+3. **Two stacks** — common + path (ec2 \| eks)  
+4. **Defer cut** until after first EKS generate shows real needs  
 
-| Stack | Template path | Status |
-|-------|---------------|--------|
-| `cluster-api-provider-aws-sigs-k8s-io` | `aws_ec2/iam/cluster-api-provider-aws-sigs-k8s-io.yaml` | `CREATE_COMPLETE` |
-
-That template mixes three concerns (11 resources):
-
-| Bucket | Resources (names under `*.cluster-api-provider-aws.sigs.k8s.io`) |
-|--------|-------------------------------------------------------------------|
-| **Common** | Role + policy (+ instance profile) **controllers** |
-| **EC2 self-managed** | **control-plane** + **nodes** (role, policy, instance profile each) |
-| **EKS** | Role **eks-controlplane** + policy **controllers-eks** |
-
-#### Options to decide
-
-1. **Split three stacks (proposed / preferred for teaching)**  
-   - Layout e.g. `aws_iam/common.yaml`, `aws_iam/ec2-self-managed.yaml`, `aws_iam/eks.yaml`  
-   - Deploy: always **common**; add **ec2** and/or **eks** per path  
-   - Cross-stack: attach `controllers-eks` policy to **common** controllers role when EKS path is enabled  
-   - Tradeoff: you own the cut; `clusterawsadm print-cloudformation-template` is no longer 1:1 with “the” stack  
-
-2. **Keep one CAPA stack**  
-   - Reuse existing for both `aws_ec2` and `aws_eks`  
-   - Fastest; unused IAM bits idle at $0  
-
-3. **Two stacks**  
-   - common + path (ec2 \| eks) — middle ground  
-
-4. **Defer cut until after first EKS `clusterctl generate`**  
-   - Reuse stack for first EKS lab, then split based on what CRs actually need  
-
-#### Decision record (fill in at start of session)
+#### Decision record (fill at start of session)
 
 | Field | Value |
 |-------|--------|
-| **Chosen option** | _TBD — decide at start of next session_ |
+| **Chosen option** | _TBD_ |
 | **Rationale** | |
 | **Stack names** | |
 | **Repo paths** | |
 | **Deploy order** | |
-| **What to do with existing monolith stack** | leave / delete / migrate |
+| **Existing monolith** | leave / delete / migrate |
 
-#### If option 1 is chosen — implementation sketch
+#### If option 1 — implement sketch
 
-1. Create `aws_iam/` (shared; not under only `aws_ec2/`).  
-2. Cut current template into three files by resource ownership (table above).  
-3. Document:  
-   - `aws_ec2` needs **common + ec2**  
-   - `aws_eks` needs **common + eks** (and nodes profile if workers still use CAPA EC2 machines)  
-4. Deploy with `aws cloudformation deploy --template-file …` only (no blind `clusterawsadm create`).  
-5. Update READMEs; optionally delete or leave monolith stack after cutover.  
-6. Then proceed to `aws_eks/` cluster manifests.
+1. Create `aws_iam/` shared tree.  
+2. Cut template by ownership table.  
+3. Docs: `aws_ec2` → common+ec2; `aws_eks` → common+eks (+ nodes if workers still EC2).  
+4. Apply only via `aws cloudformation deploy --template-file` (YAML-first).  
+5. Then scaffold `aws_eks/`.
 
 ---
 
 ## Second task (after IAM decision): `aws_eks`
 
-Mirror `aws_ec2/` structure:
-
 ```text
 aws_eks/
   README.md
-  clusters/          # CAPA EKS-oriented Cluster / AWSManagedControlPlane / etc.
-  # iam/ only if path-specific notes; prefer aws_iam/ for CFN
+  clusters/     # EKS-oriented CAPA manifests
 ```
 
-High-level:
-
-1. `clusterctl generate` with CAPA **EKS** template (pin versions).  
-2. YAML-first under `aws_eks/`; Flux path decision (new Kustomization or shared).  
-3. Apply via Kind CAPA → AWS EKS (not “Flux applies to AWS directly”).  
-4. Document differences vs EC2 path (CNI/CCM often different on EKS).
-
-**Assumption to validate after IAM decision:** same CAPA controllers on Kind; EKS may still use `nodes.*` IAM if workers are EC2 machine pools.
+1. Generate CAPA EKS template (`clusterctl`) into git.  
+2. Flux path: new Kustomization or document apply.  
+3. CAPA on Kind → EKS in AWS (same GitOps rule as EC2).  
+4. Document CNI/CCM differences vs `aws_ec2`.
 
 ---
 
-## Current environment snapshot (end of 2026-07-13)
+## Session completed (aws_ec2)
 
-| Component | Status |
+| Milestone | Result |
 |-----------|--------|
-| GitHub `main` | `12456c5` — single-AZ (`availabilityZoneUsageLimit: 1`) for next EC2 create |
-| Kind `capi-mgmt` | Up |
-| Flux | Up; **`aws-ec2-clusters` SUSPENDED** (prevents recreate) |
-| Flux last applied `aws-ec2-clusters` | `cef0233` (older than HEAD single-NAT commit) |
-| Workload `capi-lab-1` | **Deleted** (no Cluster; EC2 terminated; VPC/NAT/NLB gone) |
-| IAM CFN monolith | **CREATE_COMPLETE** (keep or migrate after decision) |
-| SSH key | `Lonny_EtcConsulting` (pre-existing; free) |
-| Orphans on Kind (optional clean) | CRS `crs-ccm`/`crs-csi` + addon ConfigMaps in `default` may remain |
+| Kind `capi-mgmt` | Management plane |
+| Flux + Weave UI | GitOps on Kind; UI port-forward 9001 |
+| CAPA init | controllers on Kind |
+| IAM CFN from YAML | GitOps-corrected (tear+redeploy from file) |
+| Workload `capi-lab-1` | EC2 CAPA cluster (v1.34.1) |
+| CNI + CCM | Calico + fixed CCM DS under `aws_ec2/clusters/addons/` |
+| Single NAT | `availabilityZoneUsageLimit: 1` in manifest |
+| Teardown | Cluster deleted; EC2 terminated; VPC/NAT/NLB gone |
 
 ### Principles (carry forward)
 
-1. **All AWS changes from tracked YAML** (no blind bootstrap CLIs as source of truth).  
+1. **AWS changes only from tracked YAML.**  
 2. Flux → **Kind**; CAPA → **AWS**.  
-3. Workload CNI/CCM live under addons applied to **workload** API (or CRS), not blindly on Kind.  
-4. Lab cost: **1 AZ / 1 NAT** for EC2 path (`availabilityZoneUsageLimit: 1`).
+3. Workload addons apply to **workload** API (`addons/`), not Kind Flux path.  
+4. Lab cost: **1 AZ / 1 NAT** for next EC2 create.
 
-### Key paths
+---
 
-| Path | Purpose |
-|------|---------|
-| `aws_ec2/clusters/capi-lab-1.yaml` | EC2 CAPA cluster (1 NAT layout ready) |
-| `aws_ec2/clusters/addons/` | Calico + fixed CCM DS (workload apply) |
-| `aws_ec2/iam/` | Current monolith CAPA IAM template + README |
-| `clusters/capi-mgmt/` | Flux bootstrap + Weave UI + `aws-ec2-clusters` Kustomization |
-| `local/Process.md` | Machine process log (**gitignored**) |
+## Live environment snapshot (2026-07-13 EOD)
+
+| Component | Status |
+|-----------|--------|
+| GitHub `main` | includes handoff + single-NAT + addons |
+| Kind `capi-mgmt` | **Up** |
+| Flux `flux-system` | **Running**, tracks latest |
+| Flux `aws-ec2-clusters` | **SUSPENDED** (won’t recreate cluster) |
+| Workload Cluster CR | **None** |
+| AWS EC2/VPC/NAT/NLB for capi-lab-1 | **Gone** (instances terminated) |
+| IAM CFN monolith | **CREATE_COMPLETE** |
+| SSH key `Lonny_EtcConsulting` | Pre-existing, free |
+| Kind orphans (optional) | CRS/ConfigMaps for CCM/CSI may remain in `default` |
 
 ### Useful commands
 
 ```bash
 kubectl config use-context kind-capi-mgmt
 flux get kustomizations -A
-# Resume EC2 path only when intended:
-# flux resume kustomization aws-ec2-clusters -n flux-system
+# flux resume kustomization aws-ec2-clusters -n flux-system   # only if recreating EC2 cluster
 
 aws cloudformation describe-stacks --region us-east-2 \
   --stack-name cluster-api-provider-aws-sigs-k8s-io \
   --query 'Stacks[0].StackStatus'
 ```
 
+### Key paths
+
+| Path | Purpose |
+|------|---------|
+| `aws_ec2/clusters/capi-lab-1.yaml` | EC2 CAPA cluster (1 NAT layout) |
+| `aws_ec2/clusters/addons/` | Calico + CCM DS (workload `kubectl apply -k`) |
+| `aws_ec2/iam/` | Monolith CAPA IAM template |
+| `clusters/capi-mgmt/` | Flux + Weave + aws-ec2-clusters Kustomization |
+| `local/Process.md` | Machine process log (**gitignored**) |
+| `graphify-out/` | Project knowledge graph (see below) |
+
 ---
 
-## Explicit non-goals for start of next session
+## Graphify
 
-- Do not start EKS cluster generate/apply before IAM layout decision.  
-- Do not recreate `capi-lab-1` unless intentional (Kustomization is suspended for a reason).
+Rebuilt at end of session (AST only, no LLM):
+
+```bash
+cd /home/lonny/Devel/Git/capi
+graphify update . --force
+```
+
+| Artifact | Notes |
+|----------|--------|
+| `graphify-out/graph.json` | 51 nodes · 45 edges · 7 communities |
+| `graphify-out/graph.html` | Interactive view |
+| `graphify-out/GRAPH_REPORT.md` | Hubs/communities report |
+| Built from | commit near handoff refresh |
+
+God hubs (from report): IAM GitOps docs, this handoff, workload clusters GitOps, `aws_ec2` source of truth, **IAM layout decision**.
+
+After substantive doc/YAML changes tomorrow:
+
+```bash
+graphify update . --force
+# optional: graphify label .   # if API key set for community names
+```
 
 ---
 
-## Checklist for next agent / human
+## Explicit non-goals at session start
 
-- [ ] **Decision:** IAM 3-way split vs one stack vs two vs defer (fill decision record above)  
-- [ ] If split: implement `aws_iam/` + deploy order + docs; handle existing monolith  
+- No EKS generate/apply before IAM decision.  
+- No accidental `capi-lab-1` recreate (Kustomization suspended on purpose).
+
+---
+
+## Checklist for next session
+
+- [ ] **Decide** IAM layout (fill decision record)  
+- [ ] If split: implement `aws_iam/` + deploy + docs; handle monolith  
 - [ ] Scaffold `aws_eks/`  
-- [ ] Generate EKS CAPA manifests into `aws_eks/clusters/`  
-- [ ] Wire Flux (or document apply path) for EKS objects  
-- [ ] Optional: clean Kind CRS/ConfigMap orphans; optional: document EC2 recreate with 1 NAT  
+- [ ] Generate EKS CAPA YAML → git  
+- [ ] Wire Flux / apply path for EKS  
+- [ ] `graphify update .` after layout lands  
+- [ ] Optional: clean Kind CRS/ConfigMap orphans  
 
 ---
 
-*Handoff written so the IAM template cut is the first agenda item, not an afterthought mid-EKS.*
+*IAM three-template cut is the first agenda item. Graphify refreshed for resume context.*
