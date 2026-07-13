@@ -1,27 +1,49 @@
-# aws_ec2
+# aws_ec2 — GitOps source of truth for AWS
 
-Git-tracked resources that support **AWS** for this lab: CAPA/CAPI cluster definitions, IAM notes (no secrets), network helpers, and related manifests.
+This directory is the **only** place for declarative definitions of work that creates, changes, or deletes **AWS** resources for this lab.
 
-## Role in the flow
+## Project goal
+
+Prove and document how to **create and manage a Kubernetes cluster on EC2** with:
+
+- **CAPI** (Cluster API) + **CAPA** (Cluster API Provider AWS)
+- **Full GitOps**: desired state in git → apply tracked YAML → controllers / AWS APIs reconcile
 
 ```text
-GitHub (this repo)  →  GitOps on Kind (mgmt)  →  AWS managed/workload cluster (CAPA)
+GitHub (lhbarry/capi)  →  apply YAML  →  Kind (mgmt: CAPI/CAPA)  →  AWS EC2 / IAM / VPC / …
+                              │
+                              └── IAM CloudFormation: apply template file with AWS CLI
+                                  (still from tracked YAML under aws_ec2/iam/)
 ```
 
-Anything applied to provision or configure AWS infrastructure for the workload cluster lives under this directory (or is generated here and committed after scrubbing secrets).
+## Hard rules
 
-## Conventions
+1. **No blind AWS mutations.** Do not run bootstrap CLIs that only hit the AWS API (`clusterawsadm bootstrap iam create-cloudformation-stack`, ad-hoc console clicks, one-off `aws ec2 run-instances`, etc.) as the *source* of change.
+2. **YAML first.** Every AWS-facing change starts as (or is regenerated into) a file under `aws_ec2/`, reviewed, then applied **from that file**.
+3. **Apply from git paths:**
+   - **IAM (CloudFormation):** `aws cloudformation deploy --template-file aws_ec2/iam/...`
+   - **Cluster / machines / network (CAPA CRs):** `kubectl apply -f aws_ec2/clusters/...` against Kind; CAPA reconciles to AWS.
+4. **No secrets in git.** AWS keys, kubeconfigs, SSH private keys stay out of this tree (use Kind secrets / env / external secret stores).
+5. **Machine process notes** stay in `local/` (gitignored). Durable procedure lives in these READMEs + YAML.
 
-- **No secrets** in git (AWS keys, kubeconfigs, SSH private keys, bootstrap passwords).
-- Prefer declarative YAML under this tree; reference paths from GitOps tooling on Kind.
-- Generated cluster manifests go here (e.g. `aws_ec2/clusters/<name>.yaml`) after redaction if needed.
-- Machine-local process notes stay in `local/` (gitignored).
+## Layout
 
-## Layout (evolving)
+| Path | What it owns |
+|------|----------------|
+| `iam/` | CAPA bootstrap IAM CloudFormation template + apply docs |
+| `clusters/` | CAPI/CAPA workload cluster manifests (Cluster, AWSCluster, machines, …) |
+| `providers/` | Optional: exported provider install manifests for Kind (not AWS resources) |
 
-| Path | Purpose |
-|------|---------|
-| `README.md` | This file |
-| `clusters/` | CAPA/CAPI `Cluster` manifests (planned) |
-| `providers/` | CAPA/CAPI provider config applied via GitOps (planned) |
-| `iam/` | Non-secret IAM/bootstrap docs or CFN templates (planned) |
+## Correct apply order (high level)
+
+1. Kind management cluster exists; CAPI/CAPA controllers running (Kind-local; not AWS cluster nodes).
+2. CAPA credentials Secret on Kind (from local AWS profile; not committed).
+3. **Apply** `aws_ec2/iam/*.yaml` via CloudFormation **from file**.
+4. **Author** CAPA/CAPI cluster YAML under `aws_ec2/clusters/`.
+5. **Apply** those manifests to Kind; CAPA creates/updates EC2 and related AWS resources.
+6. Change management = edit YAML → re-apply (GitOps). Never “fix in AWS and forget git”.
+
+## Explicitly out of scope for this tree
+
+- Kind node lifecycle (`kind create/delete`) — local Docker only.
+- Installing CAPI controllers on Kind (`clusterctl init`) — management plane bootstrap; prefer documenting versions and optionally exporting provider YAML later into `providers/`. Controllers themselves are not the EC2 workload cluster.
