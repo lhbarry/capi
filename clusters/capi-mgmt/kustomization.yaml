@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - flux-system
   - weave-gitops-dashboard.yaml
+  - aws-ec2-clusters.yaml
