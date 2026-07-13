@@ -32,3 +32,14 @@ kubectl delete -f aws_ec2/clusters/<name>.yaml
 | `capi-lab-1` | `capi-lab-1.yaml` | v1.34.1 | us-east-2 | 1 CP + 1 worker, t3.large, key `Lonny_EtcConsulting` |
 
 Flux Kustomization **`flux-system/aws-ec2-clusters`** (defined under `clusters/capi-mgmt/aws-ec2-clusters.yaml`) syncs this directory to Kind. CAPA then provisions AWS.
+
+## Workload addons (CNI / CCM)
+
+After the CAPA cluster objects are reconciled and the API is up:
+
+```bash
+clusterctl get kubeconfig capi-lab-1 -n default > /tmp/capi-lab-1.kubeconfig
+kubectl --kubeconfig=/tmp/capi-lab-1.kubeconfig apply -k aws_ec2/clusters/addons
+```
+
+See `addons/README.md`. Parent `kustomization.yaml` stays CAPI-only (Flux → Kind).
