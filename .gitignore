@@ -1,0 +1,14 @@
+# Local-only process logs, notes, secrets, and machine-specific state
+local/
+
+# Common local / generated noise
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/
