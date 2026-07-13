@@ -29,6 +29,6 @@ kubectl delete -f aws_ec2/clusters/<name>.yaml
 
 | Cluster | File | K8s | Region | Notes |
 |---------|------|-----|--------|-------|
-| `capi-lab-1` | `capi-lab-1.yaml` | v1.32.2 | us-east-2 | 1 CP + 1 worker, t3.large, key `Lonny_EtcConsulting` |
+| `capi-lab-1` | `capi-lab-1.yaml` | v1.34.1 | us-east-2 | 1 CP + 1 worker, t3.large, key `Lonny_EtcConsulting` |
 
 Flux Kustomization **`flux-system/aws-ec2-clusters`** (defined under `clusters/capi-mgmt/aws-ec2-clusters.yaml`) syncs this directory to Kind. CAPA then provisions AWS.
