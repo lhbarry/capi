@@ -41,8 +41,8 @@ spec:
   version: v1.34.1
   network:
     vpc:
-      # Lab cost control: 1 AZ ⇒ 1 public + 1 private subnet ⇒ 1 NAT
-      availabilityZoneUsageLimit: 1
+      # EKS requires subnets in ≥2 AZs. Lab cost: 2 AZs ⇒ 2 NATs (not 3).
+      availabilityZoneUsageLimit: 2
       availabilityZoneSelection: Ordered
 ---
 apiVersion: cluster.x-k8s.io/v1beta1

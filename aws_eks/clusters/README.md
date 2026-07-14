@@ -15,7 +15,7 @@ git add aws_eks/clusters && git commit && git push
 
 | Name | File | Flavor | Notes |
 |------|------|--------|-------|
-| `capi-eks-1` | `capi-eks-1.yaml` | `eks` (EKS CP + CAPA `AWSMachine` workers) | v1.34.1, 1 worker `t3.large`, 1 AZ / 1 NAT |
+| `capi-eks-1` | `capi-eks-1.yaml` | `eks` (EKS CP + CAPA `AWSMachine` workers) | v1.34.1, 1 worker `t3.large`, **2 AZs / 2 NATs** (EKS minimum) |
 
 Not using `eks-managedmachinepool` until CAPA webhook for `AWSManagedMachinePool` is fixed on this mgmt cluster.
 
