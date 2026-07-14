@@ -67,12 +67,13 @@ spec:
       infrastructureRef:
         apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
         kind: AWSMachineTemplate
-        name: capi-eks-1-md-0
+        # New name required: AWSMachineTemplate.spec is immutable
+        name: capi-eks-1-md-0-al2023
 ---
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: AWSMachineTemplate
 metadata:
-  name: capi-eks-1-md-0
+  name: capi-eks-1-md-0-al2023
   namespace: default
 spec:
   template:
