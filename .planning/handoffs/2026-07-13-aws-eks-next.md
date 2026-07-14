@@ -132,7 +132,7 @@ aws cloudformation describe-stacks --region us-east-2 \
 | `aws_eks/` | EKS CAPA scaffold |
 | `clusters/capi-mgmt/` | Flux + Weave + aws-ec2-clusters Kustomization |
 | `local/Process.md` | Machine process log (**gitignored**) |
-| `graphify-out/` | Project knowledge graph (see below) |
+| `graphify-out/` | Project knowledge graph — **gitignored / local only** |
 | `README.md` | Repo map |
 
 ---

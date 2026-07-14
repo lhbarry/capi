@@ -22,7 +22,7 @@ GitHub (lhbarry/capi)
 | **`clusters/capi-mgmt/`** | Flux bootstrap, Weave UI, Flux Kustomizations | Flux self-manages after bootstrap |
 | **`local/`** | Process notes, secrets (gitignored) | Never commit |
 | **`.planning/handoffs/`** | Session handoffs | Git-tracked |
-| **`graphify-out/`** | Knowledge graph artifacts | Optional local/CI |
+| **`graphify-out/`** | Knowledge graph artifacts | **Local only** (gitignored) |
 
 ## IAM (one place only)
 
