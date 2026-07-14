@@ -1,6 +1,6 @@
 # CAPA EKS workload cluster — applied ONLY via Flux (aws-eks-clusters → Kind → CAPA → AWS).
 # Generated from: clusterctl generate cluster --infrastructure aws --flavor eks
-# Lab cost: single AZ / single NAT on managed VPC.
+# Lab cost: 2 AZs / 2 NATs (EKS minimum AZs).
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: Cluster
