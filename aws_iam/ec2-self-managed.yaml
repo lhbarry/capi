@@ -1,0 +1,164 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: CAPA IAM EC2 self-managed — control-plane + nodes (aws_ec2 kubeadm path). Requires capa-iam-common stack exports.
+
+Resources:
+  AWSIAMRoleControlPlane:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action:
+          - sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+        Version: 2012-10-17
+      RoleName: control-plane.cluster-api-provider-aws.sigs.k8s.io
+      ManagedPolicyArns:
+      - Fn::ImportValue: capa-iam-common-ControllersPolicyArn
+    Type: AWS::IAM::Role
+  AWSIAMRoleNodes:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action:
+          - sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+      - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+      RoleName: nodes.cluster-api-provider-aws.sigs.k8s.io
+    Type: AWS::IAM::Role
+
+  AWSIAMManagedPolicyCloudProviderControlPlane:
+    Properties:
+      Description: For the Kubernetes Cloud Provider AWS Control Plane
+      ManagedPolicyName: control-plane.cluster-api-provider-aws.sigs.k8s.io
+      PolicyDocument:
+        Statement:
+        - Action:
+          - autoscaling:DescribeAutoScalingGroups
+          - autoscaling:DescribeLaunchConfigurations
+          - autoscaling:DescribeTags
+          - ec2:AssignIpv6Addresses
+          - ec2:DescribeInstances
+          - ec2:DescribeImages
+          - ec2:DescribeRegions
+          - ec2:DescribeRouteTables
+          - ec2:DescribeSecurityGroups
+          - ec2:DescribeSubnets
+          - ec2:DescribeVolumes
+          - ec2:CreateSecurityGroup
+          - ec2:CreateTags
+          - ec2:CreateVolume
+          - ec2:ModifyInstanceAttribute
+          - ec2:ModifyVolume
+          - ec2:AttachVolume
+          - ec2:AuthorizeSecurityGroupIngress
+          - ec2:CreateRoute
+          - ec2:DeleteRoute
+          - ec2:DeleteSecurityGroup
+          - ec2:DeleteVolume
+          - ec2:DetachVolume
+          - ec2:RevokeSecurityGroupIngress
+          - ec2:DescribeVpcs
+          - elasticloadbalancing:AddTags
+          - elasticloadbalancing:AttachLoadBalancerToSubnets
+          - elasticloadbalancing:ApplySecurityGroupsToLoadBalancer
+          - elasticloadbalancing:SetSecurityGroups
+          - elasticloadbalancing:CreateLoadBalancer
+          - elasticloadbalancing:CreateLoadBalancerPolicy
+          - elasticloadbalancing:CreateLoadBalancerListeners
+          - elasticloadbalancing:ConfigureHealthCheck
+          - elasticloadbalancing:DeleteLoadBalancer
+          - elasticloadbalancing:DeleteLoadBalancerListeners
+          - elasticloadbalancing:DescribeLoadBalancers
+          - elasticloadbalancing:DescribeLoadBalancerAttributes
+          - elasticloadbalancing:DetachLoadBalancerFromSubnets
+          - elasticloadbalancing:DeregisterInstancesFromLoadBalancer
+          - elasticloadbalancing:ModifyLoadBalancerAttributes
+          - elasticloadbalancing:RegisterInstancesWithLoadBalancer
+          - elasticloadbalancing:SetLoadBalancerPoliciesForBackendServer
+          - elasticloadbalancing:CreateListener
+          - elasticloadbalancing:CreateTargetGroup
+          - elasticloadbalancing:DeleteListener
+          - elasticloadbalancing:DeleteTargetGroup
+          - elasticloadbalancing:DeregisterTargets
+          - elasticloadbalancing:DescribeListeners
+          - elasticloadbalancing:DescribeLoadBalancerPolicies
+          - elasticloadbalancing:DescribeTargetGroups
+          - elasticloadbalancing:DescribeTargetHealth
+          - elasticloadbalancing:ModifyListener
+          - elasticloadbalancing:ModifyTargetGroup
+          - elasticloadbalancing:RegisterTargets
+          - elasticloadbalancing:SetLoadBalancerPoliciesOfListener
+          - iam:CreateServiceLinkedRole
+          - kms:DescribeKey
+          Effect: Allow
+          Resource:
+          - '*'
+        Version: 2012-10-17
+      Roles:
+      - Ref: AWSIAMRoleControlPlane
+    Type: AWS::IAM::ManagedPolicy
+  AWSIAMManagedPolicyCloudProviderNodes:
+    Properties:
+      Description: For the Kubernetes Cloud Provider AWS nodes
+      ManagedPolicyName: nodes.cluster-api-provider-aws.sigs.k8s.io
+      PolicyDocument:
+        Statement:
+        - Action:
+          - ec2:AssignIpv6Addresses
+          - ec2:DescribeInstances
+          - ec2:DescribeRegions
+          - ec2:CreateTags
+          - ec2:DescribeTags
+          - ec2:DescribeNetworkInterfaces
+          - ec2:DescribeInstanceTypes
+          - ecr:GetAuthorizationToken
+          - ecr:BatchCheckLayerAvailability
+          - ecr:GetDownloadUrlForLayer
+          - ecr:GetRepositoryPolicy
+          - ecr:DescribeRepositories
+          - ecr:ListImages
+          - ecr:BatchGetImage
+          Effect: Allow
+          Resource:
+          - '*'
+        - Action:
+          - secretsmanager:DeleteSecret
+          - secretsmanager:GetSecretValue
+          Effect: Allow
+          Resource:
+          - arn:*:secretsmanager:*:*:secret:aws.cluster.x-k8s.io/*
+        - Action:
+          - ssm:UpdateInstanceInformation
+          - ssmmessages:CreateControlChannel
+          - ssmmessages:CreateDataChannel
+          - ssmmessages:OpenControlChannel
+          - ssmmessages:OpenDataChannel
+          - s3:GetEncryptionConfiguration
+          Effect: Allow
+          Resource:
+          - '*'
+        Version: 2012-10-17
+      Roles:
+      - Ref: AWSIAMRoleControlPlane
+      - Ref: AWSIAMRoleNodes
+    Type: AWS::IAM::ManagedPolicy
+  AWSIAMInstanceProfileControlPlane:
+    Properties:
+      InstanceProfileName: control-plane.cluster-api-provider-aws.sigs.k8s.io
+      Roles:
+      - Ref: AWSIAMRoleControlPlane
+    Type: AWS::IAM::InstanceProfile
+  AWSIAMInstanceProfileNodes:
+    Properties:
+      InstanceProfileName: nodes.cluster-api-provider-aws.sigs.k8s.io
+      Roles:
+      - Ref: AWSIAMRoleNodes
+    Type: AWS::IAM::InstanceProfile

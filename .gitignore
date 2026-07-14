@@ -1,7 +1,7 @@
 # Local-only process logs, notes, secrets, and machine-specific state
 local/
 
-# Graphify local cache (keep graph.json / report / html in git)
+# Graphify local cache only (graph.json / report / html may be committed)
 graphify-out/cache/
 
 # Common local / generated noise

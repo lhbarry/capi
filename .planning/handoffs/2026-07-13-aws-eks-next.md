@@ -38,16 +38,16 @@ Live status: **CREATE_COMPLETE** · **$0** billable
 3. **Two stacks** — common + path (ec2 \| eks)  
 4. **Defer cut** until after first EKS generate shows real needs  
 
-#### Decision record (fill at start of session)
+#### Decision record
 
 | Field | Value |
 |-------|--------|
-| **Chosen option** | _TBD_ |
-| **Rationale** | |
-| **Stack names** | |
-| **Repo paths** | |
-| **Deploy order** | |
-| **Existing monolith** | leave / delete / migrate |
+| **Chosen option** | **1 — Split three stacks** |
+| **Rationale** | Clear common / ec2 / eks boundaries for teaching + selective deploy |
+| **Stack names** | `capa-iam-common`, `capa-iam-ec2`, `capa-iam-eks` |
+| **Repo paths** | **`aws_iam/` only** (`common.yaml`, `ec2-self-managed.yaml`, `eks.yaml`) — not under `aws_ec2/` |
+| **Deploy order** | common → ec2 and/or eks |
+| **Existing monolith** | Deleted; do not restore under `aws_ec2/iam` |
 
 #### If option 1 — implement sketch
 
@@ -126,12 +126,14 @@ aws cloudformation describe-stacks --region us-east-2 \
 
 | Path | Purpose |
 |------|---------|
+| `aws_iam/` | **Sole** CAPA IAM CFN (common / ec2 / eks) |
 | `aws_ec2/clusters/capi-lab-1.yaml` | EC2 CAPA cluster (1 NAT layout) |
 | `aws_ec2/clusters/addons/` | Calico + CCM DS (workload `kubectl apply -k`) |
-| `aws_ec2/iam/` | Monolith CAPA IAM template |
+| `aws_eks/` | EKS CAPA scaffold |
 | `clusters/capi-mgmt/` | Flux + Weave + aws-ec2-clusters Kustomization |
 | `local/Process.md` | Machine process log (**gitignored**) |
 | `graphify-out/` | Project knowledge graph (see below) |
+| `README.md` | Repo map |
 
 ---
 
@@ -171,8 +173,8 @@ graphify update . --force
 
 ## Checklist for next session
 
-- [ ] **Decide** IAM layout (fill decision record)  
-- [ ] If split: implement `aws_iam/` + deploy + docs; handle monolith  
+- [x] **Decide** IAM layout → three stacks under `aws_iam/`  
+- [x] Implement `aws_iam/` templates + docs; monolith removed from repo tree  
 - [ ] Scaffold `aws_eks/`  
 - [ ] Generate EKS CAPA YAML → git  
 - [ ] Wire Flux / apply path for EKS  
