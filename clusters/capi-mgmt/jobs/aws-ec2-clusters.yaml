@@ -12,8 +12,7 @@ spec:
   interval: 1m0s
   retryInterval: 30s
   timeout: 5m0s
-  # Suspended: do not recreate EC2 lab until intentionally resumed via git (set suspend: false) + push.
-  suspend: true
+  suspend: false
   sourceRef:
     kind: GitRepository
     name: flux-system

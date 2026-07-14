@@ -1,4 +1,5 @@
+# Flux path ./aws_ec2/clusters — empty = no live clusters (prune removes prior CRs).
+# Manifests kept as files for next lab; re-add to resources and push to provision.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-resources:
-  - capi-lab-1.yaml
+resources: []
