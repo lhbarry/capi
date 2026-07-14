@@ -1,5 +1,45 @@
-# Flux path ./aws_eks/clusters — empty = no live clusters (prune removes prior CRs).
-# Manifests kept as files for next lab; re-add to resources and push to provision.
+# Flux path ./aws_eks/clusters
+# Parameterize via configMapGenerator + replacements (edit literals before enabling resources).
+# GitOps: push only after setting YOUR_* values; empty resources = teardown/prune.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+
+# Re-add the cluster file when provisioning, e.g.:
+#   resources: [capi-eks-1.yaml]
 resources: []
+
+configMapGenerator:
+  - name: capa-eks-cluster-params
+    namespace: default
+    literals:
+      # Set these for your environment before enabling resources and pushing.
+      - AWS_REGION=us-east-2
+      - AWS_SSH_KEY_NAME=YOUR_EC2_KEY_PAIR_NAME
+    options:
+      disableNameSuffixHash: true
+      labels:
+        capa.lab/params: eks
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: capa-eks-cluster-params
+      fieldPath: data.AWS_REGION
+    targets:
+      - select:
+          kind: AWSManagedControlPlane
+        fieldPaths:
+          - spec.region
+  - source:
+      kind: ConfigMap
+      name: capa-eks-cluster-params
+      fieldPath: data.AWS_SSH_KEY_NAME
+    targets:
+      - select:
+          kind: AWSManagedControlPlane
+        fieldPaths:
+          - spec.sshKeyName
+      - select:
+          kind: AWSMachineTemplate
+        fieldPaths:
+          - spec.template.spec.sshKeyName

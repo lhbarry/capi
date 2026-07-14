@@ -35,10 +35,10 @@ Do not use `clusterawsadm bootstrap iam create-cloudformation-stack` as the sour
 | `aws_eks` | `common` + `eks` |
 | Both | all three |
 
-## Deploy (`us-east-2`)
+## Deploy
 
 ```bash
-export AWS_REGION=us-east-2
+export AWS_REGION="${AWS_REGION:-us-east-2}"   # set to your region
 
 aws cloudformation deploy \
   --stack-name capa-iam-common \
@@ -64,11 +64,11 @@ aws cloudformation deploy \
 Path stacks first, then common:
 
 ```bash
-aws cloudformation delete-stack --stack-name capa-iam-eks --region us-east-2
-aws cloudformation delete-stack --stack-name capa-iam-ec2 --region us-east-2
-aws cloudformation wait stack-delete-complete --stack-name capa-iam-eks --region us-east-2
-aws cloudformation wait stack-delete-complete --stack-name capa-iam-ec2 --region us-east-2
-aws cloudformation delete-stack --stack-name capa-iam-common --region us-east-2
+aws cloudformation delete-stack --stack-name capa-iam-eks --region "$AWS_REGION"
+aws cloudformation delete-stack --stack-name capa-iam-ec2 --region "$AWS_REGION"
+aws cloudformation wait stack-delete-complete --stack-name capa-iam-eks --region "$AWS_REGION"
+aws cloudformation wait stack-delete-complete --stack-name capa-iam-ec2 --region "$AWS_REGION"
+aws cloudformation delete-stack --stack-name capa-iam-common --region "$AWS_REGION"
 ```
 
 ## Upstream regenerate (optional)

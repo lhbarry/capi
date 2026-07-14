@@ -1,8 +1,8 @@
 # Handoff: CAPA lab → next session (`aws_eks` + IAM layout)
 
 **Date:** 2026-07-13 (updated end of day)  
-**Repo:** `lhbarry/capi` (`main`)  
-**Resume:** open this file from `/home/lonny/Devel/Git/capi` (or `/pickup`).
+**Repo:** `YOUR_ORG/capi` (`main`)  
+**Resume:** open this file from `/home/operator/Devel/Git/capi` (or `/pickup`).
 
 ---
 
@@ -107,7 +107,7 @@ aws_eks/
 | Workload Cluster CR | **None** |
 | AWS EC2/VPC/NAT/NLB for capi-lab-1 | **Gone** (instances terminated) |
 | IAM CFN monolith | **CREATE_COMPLETE** |
-| SSH key `Lonny_EtcConsulting` | Pre-existing, free |
+| SSH key `YOUR_EC2_KEY_PAIR_NAME` | Pre-existing, free |
 | Kind orphans (optional) | CRS/ConfigMaps for CCM/CSI may remain in `default` |
 
 ### Useful commands
@@ -142,7 +142,7 @@ aws cloudformation describe-stacks --region us-east-2 \
 **`graphify-out/` is gitignored** (local only; do not commit).
 
 ```bash
-cd /home/lonny/Devel/Git/capi
+cd /home/operator/Devel/Git/capi
 graphify update . --force
 # optional: graphify label .   # if API key set for community names
 ```

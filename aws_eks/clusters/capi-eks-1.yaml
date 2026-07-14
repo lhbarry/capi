@@ -36,8 +36,8 @@ metadata:
   name: capi-eks-1-control-plane
   namespace: default
 spec:
-  region: us-east-2
-  sshKeyName: Lonny_EtcConsulting
+  region: PLACEHOLDER_AWS_REGION
+  sshKeyName: PLACEHOLDER_AWS_SSH_KEY_NAME
   version: v1.34.1
   network:
     vpc:
@@ -83,7 +83,7 @@ spec:
         eksLookupType: AmazonLinux2023
       iamInstanceProfile: nodes.cluster-api-provider-aws.sigs.k8s.io
       instanceType: t3.large
-      sshKeyName: Lonny_EtcConsulting
+      sshKeyName: PLACEHOLDER_AWS_SSH_KEY_NAME
 ---
 apiVersion: bootstrap.cluster.x-k8s.io/v1beta2
 kind: NodeadmConfigTemplate

@@ -35,5 +35,5 @@ spec:
     adminUser:
       create: true
       username: admin
-      # bcrypt only — plaintext password is not stored in git
-      passwordHash: $2a$10$2l0W6S6bZQSol0lMOR3boudYEtsUi.HZcyrijmsc3AMev37a4BNNy
+      # bcrypt for placeholder password "changeme" — rotate for real use
+      passwordHash: $2a$10$WG92IM4hd7HCwi208A/jKuWEm6hJOZW.SdAx2yHrLNohgx8KTkrfO

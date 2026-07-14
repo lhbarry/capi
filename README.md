@@ -3,7 +3,7 @@
 Prove and document creating/managing Kubernetes on AWS with **Cluster API + CAPA**, driven from this GitHub repo via **Kind** (management plane).
 
 ```text
-GitHub (lhbarry/capi)
+GitHub (this repo)
     │
     ├── Flux on Kind (capi-mgmt)  →  CAPI/CAPA objects
     │                                    │

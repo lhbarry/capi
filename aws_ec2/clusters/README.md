@@ -5,23 +5,26 @@
 Applied by Flux Kustomization **`flux-system/aws-ec2-clusters`** → Kind → CAPA → AWS.
 
 ```bash
-# Correct
-git add aws_ec2/clusters && git commit && git push
-
-# Wrong
-kubectl apply -f aws_ec2/clusters/...
+# 1) Set params in kustomization.yaml (configMapGenerator literals)
+# 2) Enable: resources: [capi-lab-1.yaml]
+# 3) git commit && git push
 ```
 
-Job definition (also in git): `clusters/capi-mgmt/jobs/aws-ec2-clusters.yaml`.
+## Parameters (`kustomization.yaml`)
+
+| Literal | Purpose |
+|---------|---------|
+| `AWS_REGION` | AWS region for `AWSCluster` |
+| `AWS_SSH_KEY_NAME` | Existing EC2 key pair name (not a private key) |
+
+Cluster YAML uses placeholders (`PLACEHOLDER_*`); **replacements** inject values from the generated ConfigMap.
 
 ## Clusters
 
-| Name | File | Notes |
-|------|------|-------|
-| `capi-lab-1` | `capi-lab-1.yaml` | kubeadm, v1.34.1, 1 CP + 1 worker, 1 AZ / 1 NAT |
-
-Job is **suspended** by default (`spec.suspend: true`) so teardown stays down. To provision: set `suspend: false` in the job YAML, commit, push.
+| File | Notes |
+|------|-------|
+| `capi-lab-1.yaml` | kubeadm, v1.34.1, 1 AZ / 1 NAT when enabled |
 
 ## Addons
 
-`addons/` — Calico + CCM; apply to **workload** API after cluster up (or extend GitOps later). Not applied by the Kind Flux job (CAPI objects only).
+`addons/` — Calico + CCM for the **workload** API after the cluster is up.

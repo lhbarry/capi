@@ -35,8 +35,8 @@ spec:
       # (CAPA default availabilityZoneUsageLimit is 3 ⇒ 3 NATs).
       availabilityZoneUsageLimit: 1
       availabilityZoneSelection: Ordered
-  region: us-east-2
-  sshKeyName: Lonny_EtcConsulting
+  region: PLACEHOLDER_AWS_REGION
+  sshKeyName: PLACEHOLDER_AWS_SSH_KEY_NAME
 ---
 apiVersion: controlplane.cluster.x-k8s.io/v1beta1
 kind: KubeadmControlPlane
@@ -77,7 +77,7 @@ spec:
     spec:
       iamInstanceProfile: control-plane.cluster-api-provider-aws.sigs.k8s.io
       instanceType: t3.large
-      sshKeyName: Lonny_EtcConsulting
+      sshKeyName: PLACEHOLDER_AWS_SSH_KEY_NAME
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: MachineDeployment
@@ -113,7 +113,7 @@ spec:
     spec:
       iamInstanceProfile: nodes.cluster-api-provider-aws.sigs.k8s.io
       instanceType: t3.large
-      sshKeyName: Lonny_EtcConsulting
+      sshKeyName: PLACEHOLDER_AWS_SSH_KEY_NAME
 ---
 apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
 kind: KubeadmConfigTemplate

@@ -1,6 +1,7 @@
 # Kind management cluster (`capi-mgmt`) — Flux GitOps
 
-Flux bootstrapped against `lhbarry/capi` path `./clusters/capi-mgmt`.
+Flux bootstrapped against this repository at path `./clusters/capi-mgmt`.
+Set `GitRepository` URL in `flux-system/gotk-sync.yaml` to your remote (bootstrap usually owns this file).
 
 ## Layout
 
@@ -27,4 +28,4 @@ Change suspend or cluster YAML **in git**, push — never `kubectl apply` the wo
 kubectl -n flux-system port-forward svc/ww-gitops-weave-gitops 9001:9001
 ```
 
-Username `admin`; password is the bcrypt in the HelmRelease (local lab secret).
+Username `admin`; default bcrypt is for **`changeme`** — rotate via HelmRelease values in git.
