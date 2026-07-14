@@ -1,0 +1,22 @@
+# Flux job: provision CAPA self-managed (EC2/kubeadm) clusters from git.
+# Path: ./aws_ec2/clusters → Kind → CAPA → AWS EC2
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: aws-ec2-clusters
+  namespace: flux-system
+  labels:
+    capa.lab/job: aws-ec2-clusters
+    capa.lab/path: aws-ec2
+spec:
+  interval: 1m0s
+  retryInterval: 30s
+  timeout: 5m0s
+  # Suspended: do not recreate EC2 lab until intentionally resumed via git (set suspend: false) + push.
+  suspend: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./aws_ec2/clusters
+  prune: true
+  wait: false

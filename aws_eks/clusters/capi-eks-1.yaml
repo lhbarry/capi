@@ -1,0 +1,90 @@
+# CAPA EKS workload cluster — applied ONLY via Flux (aws-eks-clusters → Kind → CAPA → AWS).
+# Generated from: clusterctl generate cluster --infrastructure aws --flavor eks
+# Lab cost: single AZ / single NAT on managed VPC.
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: capi-eks-1
+  namespace: default
+  labels:
+    capa.lab/path: aws-eks
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks:
+      - 192.168.0.0/16
+  controlPlaneRef:
+    apiVersion: controlplane.cluster.x-k8s.io/v1beta2
+    kind: AWSManagedControlPlane
+    name: capi-eks-1-control-plane
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+    kind: AWSManagedCluster
+    name: capi-eks-1
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSManagedCluster
+metadata:
+  name: capi-eks-1
+  namespace: default
+spec: {}
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1beta2
+kind: AWSManagedControlPlane
+metadata:
+  name: capi-eks-1-control-plane
+  namespace: default
+spec:
+  region: us-east-2
+  sshKeyName: Lonny_EtcConsulting
+  version: v1.34.1
+  network:
+    vpc:
+      # Lab cost control: 1 AZ ⇒ 1 public + 1 private subnet ⇒ 1 NAT
+      availabilityZoneUsageLimit: 1
+      availabilityZoneSelection: Ordered
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachineDeployment
+metadata:
+  name: capi-eks-1-md-0
+  namespace: default
+spec:
+  clusterName: capi-eks-1
+  replicas: 1
+  selector:
+    matchLabels: null
+  template:
+    spec:
+      bootstrap:
+        configRef:
+          apiVersion: bootstrap.cluster.x-k8s.io/v1beta2
+          kind: NodeadmConfigTemplate
+          name: capi-eks-1-md-0
+      clusterName: capi-eks-1
+      infrastructureRef:
+        apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+        kind: AWSMachineTemplate
+        name: capi-eks-1-md-0
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSMachineTemplate
+metadata:
+  name: capi-eks-1-md-0
+  namespace: default
+spec:
+  template:
+    spec:
+      iamInstanceProfile: nodes.cluster-api-provider-aws.sigs.k8s.io
+      instanceType: t3.large
+      sshKeyName: Lonny_EtcConsulting
+---
+apiVersion: bootstrap.cluster.x-k8s.io/v1beta2
+kind: NodeadmConfigTemplate
+metadata:
+  name: capi-eks-1-md-0
+  namespace: default
+spec:
+  template:
+    spec: {}

@@ -1,26 +1,35 @@
-# aws_eks — CAPA → EKS (GitOps)
+# aws_eks — CAPA → Amazon EKS (GitOps)
 
-Git-tracked resources for **EKS** workload clusters managed by CAPA on Kind.
+Declarative CAPA manifests for **EKS managed control plane** (+ EC2 workers in current flavor).
 
-## Status
+## Tenant (project rule)
 
-Scaffold only. Cluster manifests not generated yet.
+| Rule | Practice |
+|------|----------|
+| All desired state in YAML | Under `aws_eks/` (and shared `aws_iam/`) |
+| Implemented only from git | Push to `main` → Flux reconciles Kind |
+| No manual apply | No `kubectl apply` / no console for cluster create |
+| Kind is management only | Flux job `aws-eks-clusters` applies CRs to Kind; CAPA talks to AWS |
 
-## Prerequisites
+## Flux job
 
-1. Kind management cluster + CAPA controllers (`capi-mgmt`).  
-2. IAM from **[`aws_iam/`](../aws_iam/)** only: stacks **`capa-iam-common`** + **`capa-iam-eks`**.  
-3. YAML-first: generate/edit under `aws_eks/clusters/`, then apply via Flux or `kubectl` on Kind.
+| Flux Kustomization | Path | Effect |
+|--------------------|------|--------|
+| `flux-system/aws-eks-clusters` | `./aws_eks/clusters` | Apply EKS CAPA CRs to Kind |
 
-IAM is **not** stored under `aws_eks/`.
+Defined in `clusters/capi-mgmt/jobs/aws-eks-clusters.yaml` (GitOps of the GitOps job itself).
 
-## Layout (planned)
+## IAM
+
+`aws_iam/`: stacks **`capa-iam-common`** + **`capa-iam-eks`** (+ **`capa-iam-ec2`** for worker instance profile used by this flavor).
+
+## Layout
 
 | Path | Purpose |
 |------|---------|
-| `README.md` | This file |
-| `clusters/` | CAPA EKS `Cluster` / managed control plane / machine pool YAML |
+| `clusters/` | CAPA EKS cluster manifests (Flux-synced) |
+| `clusters/capi-eks-1.yaml` | First lab EKS cluster |
 
-## Principles
+## Parallel path
 
-Same as `aws_ec2/`: GitHub → Kind (Flux) → CAPA → AWS. No secrets in git.
+EC2 self-managed: `aws_ec2/` + Flux job `aws-ec2-clusters`.

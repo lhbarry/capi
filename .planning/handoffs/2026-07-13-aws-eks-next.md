@@ -139,28 +139,15 @@ aws cloudformation describe-stacks --region us-east-2 \
 
 ## Graphify
 
-Rebuilt at end of session (AST only, no LLM):
+**`graphify-out/` is gitignored** (local only; do not commit).
 
 ```bash
 cd /home/lonny/Devel/Git/capi
 graphify update . --force
-```
-
-| Artifact | Notes |
-|----------|--------|
-| `graphify-out/graph.json` | 51 nodes · 45 edges · 7 communities |
-| `graphify-out/graph.html` | Interactive view |
-| `graphify-out/GRAPH_REPORT.md` | Hubs/communities report |
-| Built from | commit near handoff refresh |
-
-God hubs (from report): IAM GitOps docs, this handoff, workload clusters GitOps, `aws_ec2` source of truth, **IAM layout decision**.
-
-After substantive doc/YAML changes tomorrow:
-
-```bash
-graphify update . --force
 # optional: graphify label .   # if API key set for community names
 ```
+
+Artifacts stay under `graphify-out/` on disk for local navigation only.
 
 ---
 

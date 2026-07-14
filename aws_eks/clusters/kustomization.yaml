@@ -1,0 +1,6 @@
+# Flux path ./aws_eks/clusters (Kustomization aws-eks-clusters) applies this to Kind.
+# Do not kubectl apply by hand.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - capi-eks-1.yaml

@@ -36,10 +36,14 @@ All CAPA IAM lives under **`aws_iam/`** — not under `aws_ec2/` or `aws_eks/`.
 
 See [`aws_iam/README.md`](aws_iam/README.md).
 
-## Workload paths
+## Workload paths (two Flux jobs on Kind)
 
-- **EC2 / kubeadm:** [`aws_ec2/`](aws_ec2/)
-- **EKS:** [`aws_eks/`](aws_eks/)
+| Job (Flux Kustomization) | Git path | Cluster tree |
+|--------------------------|----------|--------------|
+| `aws-ec2-clusters` | `./aws_ec2/clusters` | [`aws_ec2/`](aws_ec2/) self-managed kubeadm |
+| `aws-eks-clusters` | `./aws_eks/clusters` | [`aws_eks/`](aws_eks/) EKS control plane |
+
+Job CRs live in git: `clusters/capi-mgmt/jobs/`. **No manual `kubectl apply` to Kind or AWS.** Push to `main` is the implement path (subject to each job’s `spec.suspend`).
 
 ## Rules
 

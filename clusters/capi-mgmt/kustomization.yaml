@@ -3,4 +3,6 @@ kind: Kustomization
 resources:
   - flux-system
   - weave-gitops-dashboard.yaml
-  - aws-ec2-clusters.yaml
+  # Two parallel CAPA provisioning jobs (separate Flux Kustomizations)
+  - jobs/aws-ec2-clusters.yaml
+  - jobs/aws-eks-clusters.yaml
