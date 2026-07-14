@@ -77,6 +77,9 @@ metadata:
 spec:
   template:
     spec:
+      ami:
+        # EKS 1.34 has no AL2 optimized AMI; use AL2023 SSM lookup
+        eksLookupType: AmazonLinux2023
       iamInstanceProfile: nodes.cluster-api-provider-aws.sigs.k8s.io
       instanceType: t3.large
       sshKeyName: Lonny_EtcConsulting
