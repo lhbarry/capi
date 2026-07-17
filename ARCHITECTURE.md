@@ -1,6 +1,8 @@
-# Architecture — CAPA → Amazon EKS (GitOps)
+# SCKE Transformative Architecture
 
-This document describes the **primary architecture**: GitOps-driven **Cluster API + CAPA** provisioning of **Amazon EKS**, plus a **Services plane** of shared platform capabilities that run on that cluster.
+**Arch. adaptation from On-Prem to AWS Cloud Services Hosting.**
+
+This document describes the architecture: **Cluster API + CAPA** provisioning of **Amazon EKS**, plus a **Services plane** of shared platform capabilities (including CI/CD) on that cluster.
 
 **Visual overview:** [docs/architecture.svg](docs/architecture.svg)
 
@@ -8,7 +10,9 @@ This document describes the **primary architecture**: GitOps-driven **Cluster AP
 
 **Criticality:** lab / learning / demonstration — not a production multi-account platform. Lab vs production targets are explicit below.
 
-> **Self-managed EC2 (`aws_ec2/`):** secondary. Intended to **mirror this EKS design** (same GitOps/IAM patterns) later; not the focus of this document.
+> **Self-managed EC2 (`aws_ec2/`):** secondary. Intended to **mirror this EKS design** later; not the focus of this document.
+
+> **Management cluster:** **TBD** — not fixed in this architecture. Repo may still contain experimental mgmt paths; they are not the design commitment.
 
 ---
 
@@ -22,92 +26,65 @@ Prove and document **creating and managing EKS on AWS** with:
 | AWS provider | [CAPA](https://cluster-api-aws.sigs.k8s.io/) |
 | Control plane | **Amazon EKS** via CAPA `AWSManagedControlPlane` |
 | Workers | CAPA `MachineDeployment` on **EC2** (AL2023 EKS AMI lookup) |
-| Services plane | Shared data, registry, identity, and observability on EKS (see §7) |
-| Desired state | Git (this repository) |
-| Management plane | Kind cluster (`capi-mgmt`) + Flux |
+| Services plane | Shared platform on EKS: CI/CD, data, registry, identity, observability (see §7) |
+| Desired state | Git (this repository) for CAPA YAML, IAM, and (target) services |
+| Management plane | **TBD** (empty / undecided) |
 | CAPA IAM | CloudFormation under `aws_iam/` only |
 
-**Non-goals (today):** multi-account landing zone, multi-region DR, full production security baseline, customer application platform, self-managed kubeadm as the primary story.
+**Non-goals (today):** multi-account landing zone, multi-region DR, full production security baseline, customer application platform, self-managed kubeadm as the primary story, a committed management-cluster product.
 
 ---
 
 ## 2. High-level topology
 
 ```text
-                 ┌──────────────────────────────────┐
-                 │         This Git repo            │
-                 │  clusters/capi-mgmt · aws_eks/   │
-                 │           aws_iam/               │
-                 └───────────────┬──────────────────┘
-                                 │
-           ┌─────────────────────┼─────────────────────┐
-           │ push / Flux         │                     │ CFN deploy
-           ▼                     │                     ▼
-  ┌─────────────────┐            │            ┌─────────────────┐
-  │ Kind: capi-mgmt │            │            │ CloudFormation  │
-  │ Flux + CAPI/CAPA│            │            │ common + eks    │
-  │ job: aws-eks-…  │            │            │ (+ nodes prof.) │
-  └────────┬────────┘            │            └────────┬────────┘
-           │ CAPA → AWS APIs     │                     │ IAM
-           ▼                     │                     ▼
-  ┌────────────────────────────────────────────────────────────┐
-  │                      AWS account                           │
-  │  ┌─ Workload plane (EKS) ────────────────────────────────┐ │
-  │  │  VPC · EKS managed CP · EC2 workers                   │ │
-  │  └───────────────────────────────────────────────────────┘ │
-  │  ┌─ CI/CD (GitOps CD) ───────────────────────────────────┐ │
-  │  │  Argo CD Principal (hub)  ↔  Agent (on EKS spoke)     │ │
-  │  └───────────────────────────────────────────────────────┘ │
-  │  ┌─ Services plane (on EKS, via Argo) ───────────────────┐ │
-  │  │  DB · Registry · IdP · Auth proxy · OTel · LGTM       │ │
-  │  └───────────────────────────────────────────────────────┘ │
-  └────────────────────────────────────────────────────────────┘
+  ┌ On Prem ────┐                                          ┌ AWS Services ─┐
+  │ AD/LDAP     │   Git · aws_eks/ · aws_iam/ · docs       │ EFS CSI (RWX) │
+  │ SMTP        │                                          │ EBS CSI (HP)  │
+  │ MS Teams    │   Management TBD    Identity CFN         │ S3            │
+  │             │         │                    │           │               │
+  │             │         ▼                    ▼           │               │
+  │             │   Workload plane (EKS) …                 │               │
+  │             │   Services plane (on EKS) …              │               │
+  └─────────────┘                                          └───────────────┘
 ```
 
 Same diagram as SVG: [docs/architecture.svg](docs/architecture.svg).
 
-### Planes
+### Planes and side surfaces
 
-| Plane | Where it runs | What lives there |
-|-------|---------------|------------------|
-| **Source of truth** | GitHub (this repo) | EKS CAPA YAML, Flux job, IAM templates, docs |
-| **Management** | Kind (`capi-mgmt`) | Flux, CAPI/CAPA controllers, `aws-eks-clusters` job, optional Weave UI |
-| **Identity bootstrap** | AWS IAM via CloudFormation | CAPA controllers + EKS CP role + node instance profile |
-| **Workload** | AWS EKS (cluster lifecycle) | Managed API/etcd; CAPA-built VPC + worker nodes |
-| **Services** | Workloads **on** the EKS cluster | Shared platform services (database, registry, identity, observability, CD agent) — see §7 |
-| **CI/CD (GitOps CD)** | Argo CD **Principal** + **Agent** | Continuous delivery of services/apps from git; see §7 |
+| Layer | Kind | Where | What lives there |
+|-------|------|-------|------------------|
+| **Source of truth** | Plane | GitHub (this repo) | EKS CAPA YAML, IAM templates, docs; services manifests (target) |
+| **Management** | Plane | **TBD** | Empty by design — CAPI/CAPA host not decided |
+| **Identity bootstrap** | Plane | AWS IAM via CloudFormation | CAPA controllers + EKS CP role + node instance profile |
+| **Workload** | Plane | AWS EKS | Network, managed CP, CAPA workers, **Argo CD Agent**, **Knative**, **Velero** |
+| **Services** | Plane | On the EKS cluster | Platform services: **CI/CD** (Argo CD Principal + Agent), **Velero**, secrets, data, registry, identity, observability — see §7 |
+| **On Prem Services** | Side surface (not a plane) | Left margin | **AD / LDAP**, **SMTP**, **MS Teams** — more TBD |
+| **AWS Services** | Side surface (not a plane) | Right margin | **EFS CSI (RWX)**, **EBS CSI (HP block)**, **S3** — more TBD |
 
-**Critical rule:** Flux applies **CAPA objects to Kind**. CAPA talks to **AWS** (EKS, EC2, VPC, …). Services plane and app delivery use **Argo CD** (not the Kind CAPA job).
+**Critical rule:** CAPA provisions **AWS** (EKS, EC2, VPC, …). **Services plane** (including Argo CD Principal) and **Workload plane** (including Argo CD Agent) both sit on EKS. Side rails are integration surfaces, not planes. Management is unspecified until decided.
 
 ---
 
-## 3. Control flow (implement path)
+## 3. Control flow (target)
 
 ```text
-1. Edit YAML in git (aws_eks cluster, job suspend, or aws_iam template)
-2. Push to main
-3a. Flux on Kind reconciles:
-      - clusters/capi-mgmt           → management config + jobs
-      - job aws-eks-clusters
-          path ./aws_eks/clusters   → CAPA CRs (Cluster, AWSManagedControlPlane, …)
-3b. Operator (when IAM changes):
-      aws cloudformation deploy --template-file aws_iam/common.yaml
-      aws cloudformation deploy --template-file aws_iam/eks.yaml
-      # node instance profile (workers): also capa-iam-ec2 today — see §5
-4. CAPA on Kind reconciles CRs → EKS + VPC + worker EC2 in AWS
-5. Argo CD delivers **services plane + apps** onto EKS:
-   - Principal (hub / control plane) holds Application desired state
-   - Agent on the target cluster applies/reconciles to the workload API
+1. Edit YAML in git (aws_eks cluster specs, aws_iam templates, later services)
+2. CAPA (once a management host exists) reconciles CAPA CRs → EKS + VPC + workers
+3. Operator (when IAM changes):
+      aws cloudformation deploy --template-file aws_iam/*.yaml
+4. Services plane on EKS (Argo CD Principal + Agent + peers) delivers
+   platform services and applications from git onto the cluster
 ```
 
-**Two GitOps roles (do not conflate):**
+Cluster lifecycle **tooling and management host are TBD**. What *is* fixed:
 
-| Tool | Role in this design |
-|------|---------------------|
-| **Flux** (on Kind) | Management-plane GitOps — CAPA cluster lifecycle only |
-| **Argo CD** (Principal + Agent) | Workload GitOps — services plane + applications on EKS |
-
-**No manual `kubectl apply` of EKS CAPA CRs** for the happy path. Push to `main` is the implement path for cluster objects (`clusters/capi-mgmt/jobs/aws-eks-clusters.yaml`).
+| Layer | Commitment |
+|-------|------------|
+| Workload cluster shape | CAPA → Amazon EKS + EC2 workers (`aws_eks/`) |
+| IAM for CAPA | CloudFormation in `aws_iam/` |
+| Services + app CD | Argo CD Principal + Agent **on the Services plane (EKS)** |
 
 IAM is deployed with the AWS CLI from templates in git (YAML-first, not console-first).
 
@@ -117,22 +94,13 @@ IAM is deployed with the AWS CLI from templates in git (YAML-first, not console-
 
 | Path | Owns | Applied by |
 |------|------|------------|
-| [`clusters/capi-mgmt/`](clusters/capi-mgmt/) | Flux bootstrap, Weave UI, **Flux jobs** | Flux (self) |
-| [`clusters/capi-mgmt/jobs/aws-eks-clusters.yaml`](clusters/capi-mgmt/jobs/aws-eks-clusters.yaml) | Job that syncs EKS CAPA path | Flux |
-| [`aws_eks/`](aws_eks/) | **Primary** — EKS CAPA cluster manifests | Flux → Kind |
+| [`aws_eks/`](aws_eks/) | **Primary** — EKS CAPA cluster manifests | TBD management path (CAPA) |
 | [`aws_iam/`](aws_iam/) | CAPA IAM CloudFormation | `aws cloudformation deploy` |
 | [`aws_ec2/`](aws_ec2/) | Secondary / future mirror of this design | Not the architecture focus |
+| [`clusters/capi-mgmt/`](clusters/capi-mgmt/) | **Lab / experimental** mgmt material | **Not** the architectural management plane |
 | [`local/`](local/) | Notes, secrets, reference clones | Never commit |
 
-### Primary Flux job
-
-| Job (`Kustomization`) | Git path | Provisions |
-|-----------------------|----------|------------|
-| `aws-eks-clusters` | `./aws_eks/clusters` | Amazon EKS + CAPA workers |
-
-Parent management kustomization: `clusters/capi-mgmt/kustomization.yaml`.
-
-Services-plane Git paths are **not yet landed** (architecture target). Prefer a clear tree under the workload (e.g. `aws_eks/services/` or a dedicated Flux Kustomization against the EKS cluster) when implementation starts.
+Architecture does **not** treat `clusters/capi-mgmt` as the decided management product — leave that box empty until chosen.
 
 ---
 
@@ -194,7 +162,7 @@ MachineDeployment (capi-eks-1-md-0)
 | Kubernetes version | `v1.34.1` | Pinned in CAPA + MD |
 | Instance type | `t3.large` | Lab default |
 | Pod CIDR | `192.168.0.0/16` | `Cluster.spec.clusterNetwork` |
-| Region / SSH | `PLACEHOLDER_*` | Filled per environment; not committed secrets |
+| Region / SSH | placeholders / params | Per environment; not committed secrets |
 
 **AWS-managed:** EKS control-plane HA, control-plane patching, etcd.  
 **CAPA-managed:** VPC/subnets/NAT pattern (via CAPA defaults + AZ limit), worker EC2 lifecycle, cluster create/update/delete via controllers.
@@ -205,7 +173,9 @@ Fields not yet pinned in YAML (rely on CAPA/EKS defaults until we grow the desig
 
 ## 7. Services plane
 
-Shared **platform services** that run on (or in front of) the EKS workload cluster. They are not CAPA cluster objects; they are the capabilities product teams and operators consume.
+Shared **platform services** that run on the EKS workload cluster. They are not CAPA cluster objects; they are the capabilities product teams and operators consume.
+
+**CI/CD is a Services-plane capability** (not a separate plane): Argo CD Principal and Agent live here with the other platform services.
 
 **Status:** architecture target (capabilities defined here). Manifests / GitOps wiring not yet in-repo.
 
@@ -215,95 +185,112 @@ Industry names are primary; **team names** in parentheses for local vocabulary.
 
 | Capability (industry) | Team name | Product / stack | Role |
 |-----------------------|-----------|-----------------|------|
-| **Continuous delivery** (GitOps CD) | CI/CD | [Argo CD](https://argo-cd.readthedocs.io/) **Principal** + **Agent** | Deploy/reconcile services & apps from git to clusters |
+| **Continuous delivery** (GitOps CD) | CI/CD | [Argo CD](https://argo-cd.readthedocs.io/) **Principal** + **Agent** | Deploy/reconcile services & apps from git |
+| **Serverless / event-driven runtime** | Runtime | [Knative](https://knative.dev/) | Scale-to-zero, eventing/serving on the workload cluster |
+| **Backup & restore** | Resilience | [Velero](https://velero.io/) | Cluster/namespace backup & restore (often to S3); on **Workload + Services** |
 | **Database platform** (PostgreSQL on Kubernetes) | Data | [CloudNativePG](https://cloudnative-pg.io/) | Cloud-native Postgres operator: HA, backups, failover |
 | **OCI container registry** (incl. pull-through cache) | Image Proxy | [Harbor](https://goharbor.io/) | Image store, vulnerability scan, proxy/cache to upstream registries |
 | **AuthN/AuthZ proxy** (identity-aware reverse proxy) | Auth/Auth | [OAuth2 Proxy](https://oauth2-proxy.github.io/oauth2-proxy/) | Protect UIs/APIs; OIDC login; forward identity headers |
 | **Identity provider (IdP)** / SSO & federation | ID Federation | [Keycloak](https://www.keycloak.org/) | Users, realms, OIDC/SAML federation, client registration |
+| **Secrets management** (secrets store) | Secrets | [OpenBao](https://openbao.org/) | Central secrets engine (Vault-compatible lineage); dynamic secrets, policies |
+| **Secrets synchronization** (K8s secret injection) | Secrets | [External Secrets Operator](https://external-secrets.io/) | Syncs external backends (OpenBao, AWS SM, etc.) → Kubernetes `Secret`s |
 | **Telemetry collection** (instrumentation pipeline) | Obs. Infra | [OpenTelemetry](https://opentelemetry.io/) | SDKs + Collector: traces, metrics, logs → backends |
 | **Observability backend** (LGTM stack) | Observability | Grafana · Loki · Tempo · Mimir | Viz + logs + traces + metrics (long-term metrics via Mimir) |
 
 ### CI/CD — Argo CD Principal and Agent
 
-Industry language: **GitOps continuous delivery** with a **hub-and-spoke** (control plane + cluster agent) layout. Team name: **CI/CD**.
+Industry language: **GitOps continuous delivery** with Principal (hub/control) + Agent (in-cluster reconciler). Team name: **CI/CD**.
 
-| Component | Industry terms | Responsibility |
-|-----------|----------------|----------------|
-| **Argo CD Principal** | Control plane · hub · management Argo CD | Holds Applications / ApplicationSets, connects to git, UI/API, RBAC; orchestrates desired state |
-| **Argo CD Agent** | Spoke · cluster agent · in-cluster reconciler | Runs **on the target cluster** (EKS); applies and reconciles resources locally so the hub need not hold long-lived high-privilege cluster-admin into every spoke |
+| Component | Industry terms | Placement | Responsibility |
+|-----------|----------------|-----------|----------------|
+| **Argo CD Principal** | Control plane · hub | **Services plane** | Applications / ApplicationSets, git, UI/API, RBAC |
+| **Argo CD Agent** | Cluster agent · spoke reconciler | **Workload plane** *and* **Services plane** | Applies/reconciles on EKS (workload substrate + services/apps) |
 
 ```text
-  Git (apps + services manifests)
-           │
-           ▼
-  ┌─────────────────────┐         control channel          ┌──────────────────────┐
-  │ Argo CD Principal   │ ◄──────────────────────────────► │ Argo CD Agent        │
-  │ (hub / control)     │                                   │ (on EKS spoke)       │
-  └─────────────────────┘                                   └──────────┬───────────┘
-                                                                       │ reconcile
-                                                                       ▼
-                                                              EKS services + apps
+  Workload plane:  Network · EKS CP · Workers · Argo Agent · Knative · Velero
+  Services plane:  Argo Principal ◄──► Argo Agent · Velero · peers (IdP, Harbor, secrets, …)
 ```
 
-| Concern | Choice for this lab architecture |
-|---------|----------------------------------|
-| Bootstrap of the EKS cluster itself | **Flux on Kind** + CAPA (unchanged) |
-| Delivery of services plane + applications | **Argo CD** Principal + Agent |
-| Principal placement (target) | Platform/management host for CD hub (lab may co-locate; production often isolates the hub) |
-| Agent placement | **On each EKS workload cluster** (spoke) |
-| Auth to Argo UI | Keycloak OIDC + OAuth2 Proxy (same as other operator UIs) |
-| Image pulls after deploy | Harbor |
+| Concern | Choice |
+|---------|--------|
+| EKS cluster lifecycle | CAPA (management host **TBD**) |
+| Principal | Services plane only |
+| Agent | Workload plane **and** Services plane |
+| Knative | **Workload plane** (app runtime substrate) |
+| Velero | **Workload plane** *and* **Services plane** (backup platform + cluster data) |
+| Delivery of other services + applications | Argo CD (once present) |
+| Auth to Argo UI | Keycloak OIDC + OAuth2 Proxy (peer services) |
+| Image pulls | Harbor (peer service) |
 
 **CI vs CD:** “CI/CD” here emphasizes **CD** (Argo CD). Build/test pipelines (CI) can feed images into **Harbor** and git manifests that Argo reconciles; CI tooling is not fixed in this document yet.
 
 ### How they relate
 
 ```text
-  Git ──► Argo CD Principal ──► Argo CD Agent ──► EKS (services + apps)
-                │
-                └── UI protected by OAuth2 Proxy ◄── Keycloak (OIDC)
-
-  CI / builders ──► Harbor (OCI registry / pull-through)
-                         ▲
-  Nodes / deploys ───────┘
-
-  Apps ──► CloudNativePG (Postgres)
-
-  Apps / nodes ──► OpenTelemetry Collector ──► Grafana LGTM
-                   (telemetry)                  Loki · Tempo · Mimir
-                                                (+ Grafana UI)
+  Workload plane:  Network · EKS CP · Workers · Argo Agent · Knative · Velero
+  Services plane:  Git ──► Argo Principal ◄──► Argo Agent ──► apps/svc
+                              │
+                              └── UI ◄── OAuth2 Proxy ◄── Keycloak
+                   Velero (also Workload) · OpenBao ◄── ESO ──► K8s Secrets
+                   CI ──► Harbor · Apps ──► CNPG · OTel ──► LGTM
+  Side surfaces:   On Prem (AD/LDAP · SMTP · MS Teams) · AWS (EFS CSI RWX · EBS CSI block · S3)
 ```
 
 | Flow | Components |
 |------|------------|
-| Deploy services/apps | Git change → Argo CD Principal → Agent reconciles on EKS |
-| Login to operator UIs | Keycloak issues tokens; OAuth2 Proxy enforces session / OIDC (incl. Argo CD UI) |
-| Image supply chain | CI pushes (or proxy-pulls) via Harbor; nodes pull from Harbor |
-| Stateful data | Workloads use CloudNativePG-managed Postgres |
-| Signals | Apps export OTLP → OpenTelemetry Collector → Mimir / Loki / Tempo; Grafana queries all three |
+| Deploy services/apps | Git → Argo CD Principal → Agent (Workload + Services) on EKS |
+| Serverless / scale-to-zero | **Knative** on Workload plane |
+| Backup / restore | **Velero** on Workload + Services (snapshots / object storage, often **S3**) |
+| Login to operator UIs | Keycloak + OAuth2 Proxy (incl. Argo CD UI) |
+| Secrets | **OpenBao** holds secrets; **External Secrets Operator** materializes them as K8s `Secret`s (can also pull AWS SM/SSM later) |
+| Image supply chain | CI → Harbor; nodes pull from Harbor |
+| Stateful data | CloudNativePG-managed Postgres; **EBS CSI** (RWO block), **EFS CSI** (RWX), **S3** object |
+| Directory / identity federation | **AD / LDAP** (on-prem) → Keycloak (Services) where applicable |
+| Signals | OTel Collector → Mimir / Loki / Tempo → Grafana |
+
+### Side surface catalogs (growing)
+
+Not planes — integration / dependency lists on the diagram margins.
+
+| Surface | Entry | Notes |
+|---------|-------|--------|
+| **On Prem Services** | **AD / LDAP** | Corporate directory; often federated via Keycloak |
+| **On Prem Services** | **SMTP** | Corporate mail relay for alerts / app mail |
+| **On Prem Services** | **MS Teams** | Chat / webhook notifications for ops and apps |
+| **AWS Services** | **EFS + CSI (RWX)** | Shared filesystem for multi-attach / RWX workloads |
+| **AWS Services** | **EBS + CSI (HP block)** | High-performance block volumes (typically RWO) |
+| **AWS Services** | **S3** | Object storage (backups, artifacts, static assets, etc.) |
+
+Add more rows here and on the SVG as the platform grows.
+
+**Candidates not yet decided** (pin AWS / elect OSS / on-prem / eliminate): see **[docs/platform-candidates.md](docs/platform-candidates.md)**. Use that list in architecture reviews; promote into this section and the SVG only after disposition.
 
 ### Placement
 
 | Decision | Choice |
 |----------|--------|
-| Host (most services) | Run **on the EKS cluster** produced by CAPA (workload plane) |
-| Argo CD Agent | **On EKS** (spoke) |
-| Argo CD Principal | CD hub — lab may share platform cluster; treat as distinct role from Flux-on-Kind |
-| Apply path for apps/services | **Argo CD**, not Kind CAPA job and not hand `kubectl` |
-| Isolation | Prefer dedicated namespaces (and later network policies) per capability |
-| Lab sizing | Shared single EKS is fine; production may split hub, platform services, and app clusters |
+| Services plane host | **On EKS**, including Argo CD Principal (+ Agent) |
+| Workload plane | EKS substrate **including Argo CD Agent, Knative, Velero** |
+| Apply path for apps / peer services | **Argo CD** |
+| On Prem / AWS Services | Vertical side surfaces — not planes; inventory grows over time |
+| Isolation | Dedicated namespaces per capability (and later network policies) |
+| Lab sizing | Single EKS holds workload + services; production may multi-cluster later |
 
 ### Lab vs production (services)
 
 | Capability | Lab target | Production target |
 |------------|------------|-------------------|
-| Argo CD Principal + Agent | Single hub + agent on lab EKS; git from this org | HA hub, per-cluster agents, SSO, project RBAC, progressive sync |
-| CloudNativePG | Single small Postgres cluster; local/object backup optional | Multi-AZ, PITR, encryption, resource quotas |
-| Harbor | Single replica / lab storage | HA, replicated storage, signing/policies, pull-through to ECR/Docker Hub |
-| OAuth2 Proxy | Protect Grafana / Harbor / Argo / Keycloak admin as needed | Consistent edge auth for all internal tools |
-| Keycloak | Single realm, lab IdP | HA, external DB (often CNPG), federation to org IdP |
-| OpenTelemetry | DaemonSet or gateway collector, sample traces | Sampling policies, multi-tenant attributes, resource limits |
-| LGTM | Single-node or small footprints | HA Mimir/Loki/Tempo, retention, auth via proxy + Keycloak |
+| Argo CD Principal + Agent (CI/CD) | Principal on Services; Agent on Workload + Services | HA Principal, agents per cluster, SSO, AppProjects |
+| Knative | Serving on Workload (lab scale) | Production quotas, eventing scope, multi-tenant limits |
+| Velero | Workload + Services; backup to S3 | Scheduled backups, immutability, restore runbooks, multi-cluster |
+| OpenBao | Single-node / lab HA mode | HA, auto-unseal, audit, policies, namespaces |
+| External Secrets Operator | Cluster-wide operator + ClusterSecretStore → OpenBao | Multi-store (OpenBao + AWS SM), refresh policies, least privilege |
+| CloudNativePG | Single small Postgres; backup optional | Multi-AZ, PITR, encryption, quotas |
+| Harbor | Single replica / lab storage | HA, signing/policies, pull-through |
+| OAuth2 Proxy | Protect Grafana / Harbor / Argo / Keycloak | Consistent edge auth for internal tools |
+| Keycloak | Single realm, lab IdP | HA, external DB (often CNPG), org IdP federation |
+| OpenTelemetry | Small collector footprint | Sampling, multi-tenant attributes, limits |
+| LGTM | Small footprints | HA backends, retention, auth via proxy + Keycloak |
 
 ---
 
@@ -313,15 +300,15 @@ Industry language: **GitOps continuous delivery** with a **hub-and-spoke** (cont
 
 | Dimension | Lab (this repo today) | Production target |
 |-----------|----------------------|-------------------|
-| Management plane | Kind + Flux | Hardened mgmt (or EKS), multi-AZ, backups, restricted API |
-| GitOps (cluster lifecycle) | Flux from `main` → Kind/CAPA | Same + PR gates, schema/policy checks |
-| GitOps (apps/services) | Argo CD Principal + Agent (target) | HA hub, agents on all spokes, SSO, AppProjects |
+| Management plane | **TBD** (empty) | Chosen host + HA, backups, restricted API |
+| Cluster lifecycle | CAPA → EKS (`aws_eks/`) | Same + policy gates, promotion envs |
+| Services / app CD | Argo CD in **Services plane** (target) | HA Principal + agents, SSO, AppProjects |
 | VPC / NAT | 2 AZs / 2 NATs | 3 AZs; consider VPC endpoints to cut NAT |
 | Workers | 1 × `t3.large` | ≥2–3 multi-AZ (services plane needs headroom) |
 | EKS API access | CAPA defaults (not explicit in YAML) | Private endpoint preferred; public CIDR allowlist if needed |
 | Control-plane logs | Not explicit | API, audit, authenticator, controller, scheduler → CloudWatch |
 | Secrets encryption | Not explicit | Customer-managed KMS key |
-| Node access | SSH key placeholders | SSM only; no standing SSH |
+| Node access | SSH key placeholders / params | SSM only; no standing SSH |
 | Pod identity | Not first-class | IRSA or EKS Pod Identity (required cleanly for services) |
 | Observability | Services plane target (OTel + LGTM) | Same stack, production HA/retention |
 | IAM controllers | CAPA-wide policies | Tag/condition scope + access reviews |
@@ -334,11 +321,12 @@ Industry language: **GitOps continuous delivery** with a **hub-and-spoke** (cont
 
 | Boundary | Description |
 |----------|-------------|
-| **Git → Kind** | Flux reconciles only declared paths (`capi-mgmt`, `aws_eks/clusters`) |
-| **Kind → AWS** | CAPA controllers use controller IAM; create EKS, VPC, EC2, … |
-| **EKS workload API** | Separate kubeconfig; services plane + apps do not run on Kind |
-| **GitOps CD** | Argo CD Principal is the control plane for app/service desired state; Agent is the privileged reconciler **on** the spoke — limit who can change Application specs in git/hub |
+| **Git → CAPA desired state** | Cluster specs in `aws_eks/`; how they are applied depends on future management choice |
+| **CAPA → AWS** | Controllers use CAPA IAM; create EKS, VPC, EC2, … |
+| **EKS workload API** | Services plane + apps run here — not on an undecided management host |
+| **Services plane CI/CD** | Argo CD Principal + Agent on EKS; limit who can change Application specs in git/hub |
 | **Identity (services)** | Keycloak is the cluster IdP; OAuth2 Proxy is the enforcement edge for UIs (including Argo CD) |
+| **Secrets** | OpenBao is the system of record; External Secrets is the only path that should mint long-lived K8s Secrets from it |
 | **Data / registry** | CNPG and Harbor hold sensitive state — network policy + secrets discipline |
 | **Telemetry** | OTel path should not become an unauthenticated write API from the internet |
 | **Human → AWS** | IAM CFN deploys and break-glass; secrets only under `local/` (gitignored) |
@@ -347,15 +335,16 @@ Industry language: **GitOps continuous delivery** with a **hub-and-spoke** (cont
 
 ## 10. Design principles
 
-1. **EKS is the product path** — architecture and docs optimize for CAPA → EKS.  
-2. **Services plane is first-class** — shared capabilities are named and owned, not ad-hoc apps.  
-3. **YAML first** — AWS and platform changes come from git.  
-4. **Flux → Kind/CAPA (clusters); Argo CD Principal+Agent → EKS (services/apps)** — do not use one tool for both jobs without intent.  
-5. **IAM is central for CAPA** — `aws_iam/` only; pod/service identity is separate.  
-6. **Cost-aware lab defaults** — 2 AZ / 2 NAT called out next to the knobs.  
-7. **No secrets in git**.  
-8. **Document lab vs prod** — §7 (services) and §8 (substrate).  
-9. **`aws_ec2` follows later** — same GitOps/IAM patterns; not dual primary architectures.
+1. **EKS is the product path** — architecture optimizes for CAPA → EKS.  
+2. **Services plane is first-class** — shared capabilities (incl. CI/CD) are named and owned.  
+3. **Management cluster is TBD** — do not invent a dual GitOps story until that host is chosen.  
+4. **YAML first** — AWS and platform changes come from git.  
+5. **CI/CD is on the Services plane** — Argo CD Principal + Agent on EKS, not a separate plane.  
+6. **IAM is central for CAPA** — `aws_iam/` only; pod/service identity is separate.  
+7. **Cost-aware lab defaults** — 2 AZ / 2 NAT called out next to the knobs.  
+8. **No secrets in git**.  
+9. **Document lab vs prod** — §7 (services) and §8 (substrate).  
+10. **`aws_ec2` follows later** — not dual primary architectures.
 
 ---
 
@@ -366,8 +355,8 @@ Industry language: **GitOps continuous delivery** with a **hub-and-spoke** (cont
 | [README.md](README.md) | Repo layout and rules |
 | [aws_eks/README.md](aws_eks/README.md) | EKS path operations |
 | [aws_iam/README.md](aws_iam/README.md) | IAM stacks and deploy order |
-| [clusters/capi-mgmt/README.md](clusters/capi-mgmt/README.md) | Flux jobs, Weave UI |
 | [docs/architecture.svg](docs/architecture.svg) | System diagram (EKS + services) |
+| [docs/platform-candidates.md](docs/platform-candidates.md) | Candidate backlog: pin AWS / elect OSS / on-prem / eliminate |
 
 ---
 
@@ -375,11 +364,13 @@ Industry language: **GitOps continuous delivery** with a **hub-and-spoke** (cont
 
 Prefer order:
 
-1. Harden EKS substrate (endpoint, logging, encryption, worker capacity for services)  
-2. Land **Argo CD Principal + Agent** (CD path for everything that runs on EKS)  
-3. Land **Services plane** via Argo (Keycloak → OAuth2 Proxy → Harbor → CNPG → OTel → LGTM)  
-4. CI validation of CAPA + services manifests; CI → Harbor image flow  
-5. IRSA / Pod Identity for each service  
-6. Then: reshape `aws_ec2/` as a clone of this operating model  
+1. Work **[platform-candidates.md](docs/platform-candidates.md)** — disposition candidates before drawing new boxes  
+2. Decide **management plane** (host + how CAPA is run) — keep the box empty until then  
+3. Harden EKS substrate (endpoint, logging, encryption, worker capacity for services)  
+4. Land **Services plane**, starting with **CI/CD** (Argo CD Principal + Agent on EKS)  
+5. Land peer services via Argo (secrets, IdP, Harbor, CNPG, OTel, LGTM, …)  
+6. CI validation of CAPA + services manifests; CI → Harbor image flow  
+7. IRSA / Pod Identity for each service  
+8. Then: reshape `aws_ec2/` as a clone of this operating model  
 
-Update this file and [docs/architecture.svg](docs/architecture.svg) when topology or the services catalog changes.
+Update this file, [docs/architecture.svg](docs/architecture.svg), and [docs/platform-candidates.md](docs/platform-candidates.md) when topology or dispositions change.

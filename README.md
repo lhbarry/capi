@@ -1,42 +1,34 @@
-# capi — CAPA → Amazon EKS (GitOps lab)
+# SCKE Transformative Architecture
 
-Prove and document creating/managing **Amazon EKS** with **Cluster API + CAPA**, driven from this GitHub repo via **Kind** (management plane).
+Arch. adaptation from On-Prem to AWS Cloud Services Hosting — **Cluster API + CAPA** → **Amazon EKS**, with a **Services plane** on that cluster.
 
-**Architecture (design + diagram):** [ARCHITECTURE.md](ARCHITECTURE.md) · [docs/architecture.svg](docs/architecture.svg)
+**Docs:** [ARCHITECTURE.md](ARCHITECTURE.md) · [docs/platform-candidates.md](docs/platform-candidates.md) (pin AWS / elect OSS / eliminate) · [docs/architecture.svg](docs/architecture.svg) (full size)
 
-```text
-GitHub (this repo)
-    │
-    ├── Flux on Kind (capi-mgmt)  →  CAPA objects (aws_eks/)
-    │                                    │
-    │                                    └── CAPA  →  Amazon EKS + EC2 workers
-    │                                                      │
-    │                                                      └── Services plane (on EKS)
-    │                                                            Argo CD Agent · DB · registry
-    │                                                            IdP · auth proxy · OTel · LGTM
-    │
-    ├── Argo CD Principal (hub)  ←→  Agent on EKS   →  services + apps
-    │
-    └── aws cloudformation deploy --template-file aws_iam/*.yaml  →  IAM
-```
+## Architecture diagram
+
+Click the preview for the full SVG.
+
+<a href="docs/architecture.svg">
+  <img src="docs/architecture.svg" alt="SCKE Transformative Architecture — click for full SVG" width="720" />
+</a>
+
+**Management cluster: TBD** — not fixed in the architecture (see [ARCHITECTURE.md](ARCHITECTURE.md)).
 
 ## Primary path: EKS + Services plane
 
 | Path | Owns | Apply how |
 |------|------|-----------|
-| **`aws_eks/`** | EKS CAPA cluster YAML (`AWSManagedControlPlane`, workers) | Flux job `aws-eks-clusters` → Kind → CAPA → AWS |
+| **`aws_eks/`** | EKS CAPA cluster YAML (`AWSManagedControlPlane`, workers) | CAPA (management host TBD) → AWS |
 | **`aws_iam/`** | CAPA IAM CloudFormation | `aws cloudformation deploy --template-file …` |
-| **`clusters/capi-mgmt/`** | Flux bootstrap, Weave UI, Flux jobs | Flux self-manages after bootstrap |
-
-Job CR: [`clusters/capi-mgmt/jobs/aws-eks-clusters.yaml`](clusters/capi-mgmt/jobs/aws-eks-clusters.yaml) → `./aws_eks/clusters`.
-
-**No manual `kubectl apply` of cluster CRs.** Push to `main` is the implement path (respect `spec.suspend`).
 
 ### Services plane (on EKS — architecture target)
 
 | Industry capability | Team name | Stack |
 |---------------------|-----------|--------|
 | Continuous delivery (GitOps CD) | CI/CD | Argo CD **Principal** + **Agent** |
+| Backup & restore (also Workload) | Resilience | Velero |
+| Secrets management | Secrets | OpenBao |
+| Secrets synchronization | Secrets | External Secrets Operator |
 | Database platform | Data | CloudNativePG |
 | OCI container registry | Image Proxy | Harbor |
 | AuthN/AuthZ proxy | Auth/Auth | OAuth2 Proxy |
@@ -44,9 +36,9 @@ Job CR: [`clusters/capi-mgmt/jobs/aws-eks-clusters.yaml`](clusters/capi-mgmt/job
 | Telemetry collection | Obs. Infra | OpenTelemetry |
 | Observability backend | Observability | Grafana · Loki · Tempo · Mimir (LGTM) |
 
-**GitOps split:** Flux on Kind = cluster lifecycle (CAPA). Argo CD = services + apps on EKS.
-
 See [ARCHITECTURE.md §7](ARCHITECTURE.md#7-services-plane).
+
+**Workload plane (also on EKS):** CAPA substrate + **Argo CD Agent**, **Knative**, **Velero** (Velero also on Services).
 
 ## IAM (one place only)
 
@@ -68,6 +60,7 @@ Self-managed kubeadm path exists under [`aws_ec2/`](aws_ec2/) but is **not** the
 
 | Path | Owns |
 |------|------|
+| **`clusters/capi-mgmt/`** | Lab / experimental management material — **not** the architectural management plane |
 | **`local/`** | Process notes, secrets (gitignored) — never commit |
 | **`.planning/handoffs/`** | Session handoffs |
 | **`graphify-out/`** | Knowledge graph artifacts (gitignored) |
@@ -75,6 +68,7 @@ Self-managed kubeadm path exists under [`aws_ec2/`](aws_ec2/) but is **not** the
 ## Rules
 
 1. **YAML first** for anything that creates/changes AWS.  
-2. Flux applies to **Kind**; CAPA reconciles to **AWS**; Argo CD delivers **services/apps** to EKS.  
-3. No secrets in git.  
-4. EKS lab cost floor: **2 AZs / 2 NATs** (`availabilityZoneUsageLimit: 2` on the managed control plane VPC).
+2. CAPA reconciles to **AWS**; **Services plane** (incl. Argo CD CI/CD) runs on **EKS**.  
+3. **Management cluster is TBD** — do not treat experimental mgmt paths as the design.  
+4. No secrets in git.  
+5. EKS lab cost floor: **2 AZs / 2 NATs** (`availabilityZoneUsageLimit: 2` on the managed control plane VPC).

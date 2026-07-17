@@ -1,4 +1,4 @@
-# aws_eks — CAPA → Amazon EKS (GitOps)
+# aws_eks — CAPA → Amazon EKS
 
 Declarative CAPA manifests for **EKS managed control plane** (+ EC2 workers in current flavor).
 
@@ -9,17 +9,9 @@ Declarative CAPA manifests for **EKS managed control plane** (+ EC2 workers in c
 | Rule | Practice |
 |------|----------|
 | All desired state in YAML | Under `aws_eks/` (and shared `aws_iam/`) |
-| Implemented only from git | Push to `main` → Flux reconciles Kind |
-| No manual apply | No `kubectl apply` / no console for cluster create |
-| Kind is management only | Flux job `aws-eks-clusters` applies CRs to Kind; CAPA talks to AWS |
-
-## Flux job
-
-| Flux Kustomization | Path | Effect |
-|--------------------|------|--------|
-| `flux-system/aws-eks-clusters` | `./aws_eks/clusters` | Apply EKS CAPA CRs to Kind |
-
-Defined in `clusters/capi-mgmt/jobs/aws-eks-clusters.yaml` (GitOps of the GitOps job itself).
+| CAPA owns AWS lifecycle | Controllers reconcile CAPA CRs → EKS / VPC / workers |
+| Management host | **TBD** (not fixed in architecture) |
+| No secrets in git | Placeholders / local-only config |
 
 ## IAM
 
@@ -29,9 +21,13 @@ Defined in `clusters/capi-mgmt/jobs/aws-eks-clusters.yaml` (GitOps of the GitOps
 
 | Path | Purpose |
 |------|---------|
-| `clusters/` | CAPA EKS cluster manifests (Flux-synced) |
+| `clusters/` | CAPA EKS cluster manifests |
 | `clusters/capi-eks-1.yaml` | First lab EKS cluster |
 
 ## Parallel path
 
-EC2 self-managed: `aws_ec2/` + Flux job `aws-ec2-clusters`.
+EC2 self-managed: [`aws_ec2/`](../aws_ec2/) — secondary; will mirror this model later.
+
+## Note
+
+`clusters/capi-mgmt/` may contain experimental Flux/Kind wiring used in the lab. That is **not** the architectural management plane — see [ARCHITECTURE.md](../ARCHITECTURE.md).
