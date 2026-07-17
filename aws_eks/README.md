@@ -2,6 +2,8 @@
 
 Declarative CAPA manifests for **EKS managed control plane** (+ EC2 workers in current flavor).
 
+**Platform architecture:** [ARCHITECTURE.md](../ARCHITECTURE.md) · [docs/architecture.svg](../docs/architecture.svg)
+
 ## Tenant (project rule)
 
 | Rule | Practice |

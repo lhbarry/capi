@@ -1,53 +1,80 @@
-# capi — CAPI / CAPA lab (GitOps)
+# capi — CAPA → Amazon EKS (GitOps lab)
 
-Prove and document creating/managing Kubernetes on AWS with **Cluster API + CAPA**, driven from this GitHub repo via **Kind** (management plane).
+Prove and document creating/managing **Amazon EKS** with **Cluster API + CAPA**, driven from this GitHub repo via **Kind** (management plane).
+
+**Architecture (design + diagram):** [ARCHITECTURE.md](ARCHITECTURE.md) · [docs/architecture.svg](docs/architecture.svg)
 
 ```text
 GitHub (this repo)
     │
-    ├── Flux on Kind (capi-mgmt)  →  CAPI/CAPA objects
+    ├── Flux on Kind (capi-mgmt)  →  CAPA objects (aws_eks/)
     │                                    │
-    │                                    └── CAPA  →  AWS (EC2 or EKS)
+    │                                    └── CAPA  →  Amazon EKS + EC2 workers
+    │                                                      │
+    │                                                      └── Services plane (on EKS)
+    │                                                            Argo CD Agent · DB · registry
+    │                                                            IdP · auth proxy · OTel · LGTM
+    │
+    ├── Argo CD Principal (hub)  ←→  Agent on EKS   →  services + apps
     │
     └── aws cloudformation deploy --template-file aws_iam/*.yaml  →  IAM
 ```
 
-## Top-level layout
+## Primary path: EKS + Services plane
 
 | Path | Owns | Apply how |
 |------|------|-----------|
-| **`aws_iam/`** | CAPA IAM CloudFormation (shared) | `aws cloudformation deploy --template-file …` |
-| **`aws_ec2/`** | Self-managed kubeadm CAPA cluster YAML + workload addons | Flux / `kubectl` on Kind; addons on workload kubeconfig |
-| **`aws_eks/`** | EKS-oriented CAPA cluster YAML | Same pattern as `aws_ec2` (scaffold) |
-| **`clusters/capi-mgmt/`** | Flux bootstrap, Weave UI, Flux Kustomizations | Flux self-manages after bootstrap |
-| **`local/`** | Process notes, secrets (gitignored) | Never commit |
-| **`.planning/handoffs/`** | Session handoffs | Git-tracked |
-| **`graphify-out/`** | Knowledge graph artifacts | **Local only** (gitignored) |
+| **`aws_eks/`** | EKS CAPA cluster YAML (`AWSManagedControlPlane`, workers) | Flux job `aws-eks-clusters` → Kind → CAPA → AWS |
+| **`aws_iam/`** | CAPA IAM CloudFormation | `aws cloudformation deploy --template-file …` |
+| **`clusters/capi-mgmt/`** | Flux bootstrap, Weave UI, Flux jobs | Flux self-manages after bootstrap |
+
+Job CR: [`clusters/capi-mgmt/jobs/aws-eks-clusters.yaml`](clusters/capi-mgmt/jobs/aws-eks-clusters.yaml) → `./aws_eks/clusters`.
+
+**No manual `kubectl apply` of cluster CRs.** Push to `main` is the implement path (respect `spec.suspend`).
+
+### Services plane (on EKS — architecture target)
+
+| Industry capability | Team name | Stack |
+|---------------------|-----------|--------|
+| Continuous delivery (GitOps CD) | CI/CD | Argo CD **Principal** + **Agent** |
+| Database platform | Data | CloudNativePG |
+| OCI container registry | Image Proxy | Harbor |
+| AuthN/AuthZ proxy | Auth/Auth | OAuth2 Proxy |
+| Identity provider (IdP) | ID Federation | Keycloak |
+| Telemetry collection | Obs. Infra | OpenTelemetry |
+| Observability backend | Observability | Grafana · Loki · Tempo · Mimir (LGTM) |
+
+**GitOps split:** Flux on Kind = cluster lifecycle (CAPA). Argo CD = services + apps on EKS.
+
+See [ARCHITECTURE.md §7](ARCHITECTURE.md#7-services-plane).
 
 ## IAM (one place only)
 
-All CAPA IAM lives under **`aws_iam/`** — not under `aws_ec2/` or `aws_eks/`.
+All CAPA IAM lives under **`aws_iam/`** — not under `aws_eks/`.
 
-| Stack | Template | Use |
-|-------|----------|-----|
+| Stack | Template | Use for EKS |
+|-------|----------|-------------|
 | `capa-iam-common` | `aws_iam/common.yaml` | Always |
-| `capa-iam-ec2` | `aws_iam/ec2-self-managed.yaml` | `aws_ec2` path |
-| `capa-iam-eks` | `aws_iam/eks.yaml` | `aws_eks` path |
+| `capa-iam-eks` | `aws_iam/eks.yaml` | EKS control plane + controller policy |
+| `capa-iam-ec2` | `aws_iam/ec2-self-managed.yaml` | Node instance profile (current worker flavor) |
 
 See [`aws_iam/README.md`](aws_iam/README.md).
 
-## Workload paths (two Flux jobs on Kind)
+## Secondary: `aws_ec2/`
 
-| Job (Flux Kustomization) | Git path | Cluster tree |
-|--------------------------|----------|--------------|
-| `aws-ec2-clusters` | `./aws_ec2/clusters` | [`aws_ec2/`](aws_ec2/) self-managed kubeadm |
-| `aws-eks-clusters` | `./aws_eks/clusters` | [`aws_eks/`](aws_eks/) EKS control plane |
+Self-managed kubeadm path exists under [`aws_ec2/`](aws_ec2/) but is **not** the architecture focus. It will be reshaped as a **clone of the EKS operating model** later.
 
-Job CRs live in git: `clusters/capi-mgmt/jobs/`. **No manual `kubectl apply` to Kind or AWS.** Push to `main` is the implement path (subject to each job’s `spec.suspend`).
+## Other paths
+
+| Path | Owns |
+|------|------|
+| **`local/`** | Process notes, secrets (gitignored) — never commit |
+| **`.planning/handoffs/`** | Session handoffs |
+| **`graphify-out/`** | Knowledge graph artifacts (gitignored) |
 
 ## Rules
 
 1. **YAML first** for anything that creates/changes AWS.  
-2. Flux applies to **Kind**; CAPA reconciles to **AWS**.  
+2. Flux applies to **Kind**; CAPA reconciles to **AWS**; Argo CD delivers **services/apps** to EKS.  
 3. No secrets in git.  
-4. Lab network cost control for EC2 path: single AZ / single NAT (`availabilityZoneUsageLimit: 1`).
+4. EKS lab cost floor: **2 AZs / 2 NATs** (`availabilityZoneUsageLimit: 2` on the managed control plane VPC).

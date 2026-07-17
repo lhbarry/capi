@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 1100" width="1120" height="1100" role="img" aria-labelledby="title desc">
+  <title id="title">CAPA to Amazon EKS with Services plane and Argo CD</title>
+  <desc id="desc">Git feeds Flux on Kind for CAPA EKS. Argo CD Principal and Agent deliver services plane: Harbor, Keycloak, OAuth2 Proxy, CloudNativePG, OpenTelemetry, Grafana LGTM.</desc>
+
+  <defs>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb"/>
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#d97706"/>
+    </marker>
+    <marker id="arrow-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7c3aed"/>
+    </marker>
+    <marker id="arrow-rose" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#e11d48"/>
+    </marker>
+    <filter id="shadow" x="-2%" y="-2%" width="104%" height="108%">
+      <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#0f172a" flood-opacity="0.12"/>
+    </filter>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#f5f3ff"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1120" height="1100" fill="url(#bg)"/>
+
+  <!-- Title -->
+  <text x="560" y="30" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="20" font-weight="700" fill="#0f172a">CAPA → Amazon EKS · Services plane · Argo CD</text>
+  <text x="560" y="48" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" fill="#64748b">Flux = cluster lifecycle · Argo CD Principal + Agent = services &amp; apps · shared platform on EKS</text>
+
+  <!-- ========== Source of truth ========== -->
+  <g filter="url(#shadow)">
+    <rect x="80" y="62" width="960" height="70" rx="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+  </g>
+  <text x="100" y="82" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#64748b" letter-spacing="0.04em">SOURCE OF TRUTH</text>
+  <rect x="100" y="90" width="160" height="28" rx="6" fill="#0f172a"/>
+  <text x="180" y="109" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#f8fafc">GitHub · this repo</text>
+  <g font-family="ui-monospace, Menlo, monospace" font-size="10" fill="#1e293b">
+    <rect x="280" y="90" width="130" height="28" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+    <text x="345" y="108" text-anchor="middle">capi-mgmt</text>
+    <rect x="420" y="90" width="100" height="28" rx="6" fill="#d1fae5" stroke="#6ee7b7"/>
+    <text x="470" y="108" text-anchor="middle">aws_eks/ ★</text>
+    <rect x="530" y="90" width="90" height="28" rx="6" fill="#fef3c7" stroke="#fcd34d"/>
+    <text x="575" y="108" text-anchor="middle">aws_iam/</text>
+    <rect x="630" y="90" width="180" height="28" rx="6" fill="#ffe4e6" stroke="#fda4af"/>
+    <text x="720" y="108" text-anchor="middle">apps + services git</text>
+    <rect x="820" y="90" width="200" height="28" rx="6" fill="#ede9fe" stroke="#c4b5fd"/>
+    <text x="920" y="108" text-anchor="middle">services plane target</text>
+  </g>
+
+  <line x1="260" y1="132" x2="260" y2="158" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <text x="270" y="150" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#2563eb">Flux</text>
+  <line x1="575" y1="132" x2="575" y2="158" stroke="#d97706" stroke-width="2" marker-end="url(#arrow-amber)"/>
+  <text x="585" y="150" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#d97706">CFN</text>
+  <line x1="720" y1="132" x2="720" y2="158" stroke="#e11d48" stroke-width="2" marker-end="url(#arrow-rose)"/>
+  <text x="730" y="150" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#e11d48">Argo</text>
+
+  <!-- ========== Management + IAM ========== -->
+  <g filter="url(#shadow)">
+    <rect x="80" y="166" width="520" height="120" rx="12" fill="#ffffff" stroke="#93c5fd" stroke-width="2"/>
+  </g>
+  <rect x="80" y="166" width="520" height="26" rx="12" fill="#dbeafe"/>
+  <rect x="80" y="180" width="520" height="12" fill="#dbeafe"/>
+  <text x="96" y="186" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#1d4ed8" letter-spacing="0.04em">MANAGEMENT · Kind (capi-mgmt)</text>
+
+  <rect x="96" y="204" width="120" height="36" rx="6" fill="#eff6ff" stroke="#60a5fa"/>
+  <text x="156" y="226" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e3a8a">Flux + CAPI/CAPA</text>
+  <rect x="228" y="204" width="350" height="36" rx="6" fill="#d1fae5" stroke="#34d399"/>
+  <text x="403" y="226" text-anchor="middle" font-family="ui-monospace, monospace" font-size="10" font-weight="600" fill="#065f46">aws-eks-clusters → ./aws_eks/clusters</text>
+  <text x="96" y="266" font-family="system-ui, sans-serif" font-size="10" fill="#64748b">Cluster lifecycle only — not app delivery</text>
+
+  <g filter="url(#shadow)">
+    <rect x="620" y="166" width="420" height="120" rx="12" fill="#ffffff" stroke="#fcd34d" stroke-width="2"/>
+  </g>
+  <rect x="620" y="166" width="420" height="26" rx="12" fill="#fef3c7"/>
+  <rect x="620" y="180" width="420" height="12" fill="#fef3c7"/>
+  <text x="636" y="186" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#b45309" letter-spacing="0.04em">IDENTITY BOOTSTRAP · aws_iam/</text>
+  <text x="636" y="220" font-family="ui-monospace, monospace" font-size="10" fill="#92400e">common · eks · ec2 (node profile)</text>
+  <text x="636" y="242" font-family="system-ui, sans-serif" font-size="10" fill="#64748b">CAPA controller + EKS CP + node IAM</text>
+  <text x="636" y="264" font-family="system-ui, sans-serif" font-size="10" fill="#64748b">Services use IRSA / Pod Identity later</text>
+
+  <line x1="340" y1="286" x2="340" y2="312" stroke="#2563eb" stroke-width="2.5" marker-end="url(#arrow-blue)"/>
+  <text x="352" y="304" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#2563eb">CAPA → AWS</text>
+
+  <!-- ========== Workload plane ========== -->
+  <g filter="url(#shadow)">
+    <rect x="80" y="320" width="960" height="100" rx="12" fill="#ffffff" stroke="#34d399" stroke-width="2"/>
+  </g>
+  <rect x="80" y="320" width="960" height="26" rx="12" fill="#a7f3d0"/>
+  <rect x="80" y="334" width="960" height="12" fill="#a7f3d0"/>
+  <text x="96" y="340" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#065f46" letter-spacing="0.04em">WORKLOAD PLANE · Amazon EKS (CAPA substrate)</text>
+
+  <rect x="96" y="358" width="300" height="44" rx="8" fill="#ecfdf5" stroke="#6ee7b7"/>
+  <text x="246" y="376" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#065f46">Network</text>
+  <text x="246" y="392" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#334155">VPC · 2 AZs · 2 NATs (lab)</text>
+
+  <rect x="410" y="358" width="300" height="44" rx="8" fill="#ecfdf5" stroke="#6ee7b7"/>
+  <text x="560" y="376" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#065f46">EKS control plane</text>
+  <text x="560" y="392" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#334155">Managed API / etcd · HA by AWS</text>
+
+  <rect x="724" y="358" width="300" height="44" rx="8" fill="#ecfdf5" stroke="#6ee7b7"/>
+  <text x="874" y="376" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#065f46">Workers (CAPA)</text>
+  <text x="874" y="392" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#334155">EC2 · AL2023 · lab sizing</text>
+
+  <!-- ========== CI/CD band (Argo) ========== -->
+  <line x1="560" y1="420" x2="560" y2="444" stroke="#e11d48" stroke-width="2.5" marker-end="url(#arrow-rose)"/>
+  <text x="572" y="438" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#e11d48">CD path</text>
+
+  <g filter="url(#shadow)">
+    <rect x="80" y="452" width="960" height="100" rx="12" fill="#ffffff" stroke="#fb7185" stroke-width="2"/>
+  </g>
+  <rect x="80" y="452" width="960" height="26" rx="12" fill="#ffe4e6"/>
+  <rect x="80" y="466" width="960" height="12" fill="#ffe4e6"/>
+  <text x="96" y="472" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#9f1239" letter-spacing="0.04em">CI/CD · CONTINUOUS DELIVERY (GitOps CD) · team: CI/CD</text>
+
+  <rect x="96" y="490" width="420" height="48" rx="8" fill="#fff1f2" stroke="#fda4af"/>
+  <text x="112" y="510" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#9f1239">Argo CD Principal</text>
+  <text x="112" y="528" font-family="system-ui, sans-serif" font-size="10" fill="#64748b">Hub · control plane · Applications / UI · git</text>
+
+  <text x="540" y="518" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#e11d48">↔</text>
+
+  <rect x="580" y="490" width="440" height="48" rx="8" fill="#fff1f2" stroke="#fda4af"/>
+  <text x="596" y="510" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#9f1239">Argo CD Agent</text>
+  <text x="596" y="528" font-family="system-ui, sans-serif" font-size="10" fill="#64748b">Spoke · on EKS · reconciles services + apps</text>
+
+  <line x1="800" y1="538" x2="800" y2="562" stroke="#7c3aed" stroke-width="2.5" marker-end="url(#arrow-violet)"/>
+  <text x="810" y="556" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#7c3aed">reconcile</text>
+
+  <!-- ========== Services plane ========== -->
+  <g filter="url(#shadow)">
+    <rect x="80" y="570" width="960" height="470" rx="12" fill="#ffffff" stroke="#a78bfa" stroke-width="2"/>
+  </g>
+  <rect x="80" y="570" width="960" height="30" rx="12" fill="#ede9fe"/>
+  <rect x="80" y="588" width="960" height="12" fill="#ede9fe"/>
+  <text x="96" y="592" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#5b21b6" letter-spacing="0.04em">SERVICES PLANE · shared platform capabilities on EKS</text>
+  <text x="1000" y="592" text-anchor="end" font-family="system-ui, sans-serif" font-size="9" fill="#7c3aed">architecture target</text>
+
+  <!-- Row: identity -->
+  <text x="96" y="626" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#6b7280" letter-spacing="0.03em">IDENTITY &amp; ACCESS</text>
+
+  <rect x="96" y="634" width="300" height="78" rx="8" fill="#f5f3ff" stroke="#c4b5fd"/>
+  <text x="112" y="656" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#4c1d95">Identity provider (IdP)</text>
+  <text x="112" y="672" font-family="system-ui, sans-serif" font-size="9" fill="#7c3aed">team: ID Federation</text>
+  <text x="112" y="692" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e1b4b">Keycloak · SSO / OIDC / SAML</text>
+
+  <rect x="410" y="634" width="300" height="78" rx="8" fill="#f5f3ff" stroke="#c4b5fd"/>
+  <text x="426" y="656" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#4c1d95">AuthN / AuthZ proxy</text>
+  <text x="426" y="672" font-family="system-ui, sans-serif" font-size="9" fill="#7c3aed">team: Auth/Auth</text>
+  <text x="426" y="692" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e1b4b">OAuth2 Proxy · edge for UIs</text>
+
+  <rect x="724" y="634" width="300" height="78" rx="8" fill="#f5f3ff" stroke="#c4b5fd"/>
+  <text x="740" y="656" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#4c1d95">OCI container registry</text>
+  <text x="740" y="672" font-family="system-ui, sans-serif" font-size="9" fill="#7c3aed">team: Image Proxy</text>
+  <text x="740" y="692" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e1b4b">Harbor · store / scan / pull-through</text>
+
+  <!-- Row: data + obs -->
+  <text x="96" y="738" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#6b7280" letter-spacing="0.03em">DATA &amp; OBSERVABILITY</text>
+
+  <rect x="96" y="746" width="300" height="78" rx="8" fill="#f5f3ff" stroke="#c4b5fd"/>
+  <text x="112" y="768" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#4c1d95">Database platform</text>
+  <text x="112" y="784" font-family="system-ui, sans-serif" font-size="9" fill="#7c3aed">team: Data</text>
+  <text x="112" y="804" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e1b4b">CloudNativePG · PostgreSQL</text>
+
+  <rect x="410" y="746" width="300" height="78" rx="8" fill="#f5f3ff" stroke="#c4b5fd"/>
+  <text x="426" y="768" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#4c1d95">Telemetry collection</text>
+  <text x="426" y="784" font-family="system-ui, sans-serif" font-size="9" fill="#7c3aed">team: Obs. Infra</text>
+  <text x="426" y="804" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e1b4b">OpenTelemetry · Collector / OTLP</text>
+
+  <rect x="724" y="746" width="300" height="78" rx="8" fill="#f5f3ff" stroke="#c4b5fd"/>
+  <text x="740" y="768" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#4c1d95">Observability backend</text>
+  <text x="740" y="784" font-family="system-ui, sans-serif" font-size="9" fill="#7c3aed">team: Observability</text>
+  <text x="740" y="804" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#1e1b4b">Grafana LGTM · Loki · Tempo · Mimir</text>
+
+  <!-- Flow notes -->
+  <rect x="96" y="842" width="928" height="72" rx="8" fill="#faf5ff" stroke="#ddd6fe"/>
+  <text x="560" y="866" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#5b21b6">Git → Argo CD Principal ↔ Agent → EKS services/apps · CI → Harbor · Keycloak → OAuth2 Proxy → UIs</text>
+  <text x="560" y="886" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#5b21b6">Apps → CNPG · OTel Collector → Mimir / Loki / Tempo → Grafana</text>
+  <text x="560" y="904" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#94a3b8">Flux ≠ Argo: Flux bootstraps the cluster via CAPA; Argo delivers everything that runs on EKS</text>
+
+  <rect x="96" y="928" width="928" height="90" rx="8" fill="#fff1f2" stroke="#fecdd3"/>
+  <text x="112" y="952" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#9f1239">GitOps split</text>
+  <text x="112" y="974" font-family="system-ui, sans-serif" font-size="11" fill="#334155">Flux on Kind → CAPA CRs → EKS lifecycle (create/update/delete cluster)</text>
+  <text x="112" y="994" font-family="system-ui, sans-serif" font-size="11" fill="#334155">Argo CD Principal (hub) + Agent (on EKS) → services plane + application workloads</text>
+  <text x="112" y="1014" font-family="system-ui, sans-serif" font-size="10" fill="#94a3b8">See ARCHITECTURE.md §7 · Principal placement may be isolated in production; Agent always on spoke</text>
+
+  <!-- Footer -->
+  <text x="560" y="1075" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#94a3b8">Primary: aws_eks · Services + CD catalog in ARCHITECTURE.md §7 · aws_ec2 secondary</text>
+</svg>
