@@ -270,8 +270,8 @@ Industry language: **GitOps continuous delivery**. Team name: **CI/CD**.
 | **Agent** | **Workload cluster only** | Local reconcile; reports to Principal; independent if Principal is down; **not** on Services |
 
 ```text
-  Services cluster:  Principal + ApplicationController · Karpenter · platform peers
-  Workload cluster:  Agent (→ reports to Principal) · Knative · apps · Velero (also Services)
+  Services cluster:  Principal + ApplicationController · CAPA ×5 Reserved · platform peers
+  Workload cluster:  Agent · Karpenter · Knative · apps
 ```
 
 | Concern | Choice |

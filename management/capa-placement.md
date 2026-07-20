@@ -21,7 +21,7 @@
 ┌─ Services EKS ─────────────┐   ┌─ Workload EKS ──────────────┐
 │  capi-eks-services         │   │  capi-eks-workload          │
 │  Principal+AppController   │   │  Agent → Principal          │
-│  Karpenter (services)      │   │  Karpenter (workload)       │
+│  CAPA MD × 5 Reserved      │   │  Karpenter (only here)      │
 └────────────────────────────┘   └─────────────────────────────┘
 ```
 
