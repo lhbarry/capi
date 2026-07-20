@@ -338,7 +338,7 @@ Add more rows here and on the SVG as the platform grows.
 
 | Capability | Production design bar |
 |------------|----------------------|
-| Argo CD Principal + Agent (CI/CD) | HA Principal, agents on Workload + Services, SSO, AppProjects, RBAC |
+| Argo CD (CI/CD) | Principal + ApplicationController on **Services**; Agent on **Workload** (independent); SSO; AppProjects |
 | Karpenter | Services plane; **5+5 Reserved** + **1.5× headroom**; multi-AZ; IRSA + dedicated node role; disruption budgets |
 | Knative | Workload plane; quotas, multi-tenant limits, measured eventing scope |
 | Velero | Workload + Services; scheduled backups to S3, immutability, **restore runbooks + drills** |
