@@ -1,0 +1,47 @@
+# OpenTelemetry Collector Gateway — Services cluster (sketch)
+# Receives OTLP from Workload + local; exports metrics→Mimir, logs→Loki, traces→Tempo.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-gateway-config-sketch
+  namespace: observability
+  labels:
+    scke.io/observability: lgtm
+data:
+  relay.yaml: |
+    # Illustrative — replace with real Collector CR/Helm values at install
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    processors:
+      batch: {}
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 512
+    exporters:
+      prometheusremotewrite:
+        endpoint: http://mimir-nginx.observability.svc:80/api/v1/push
+      loki:
+        endpoint: http://loki-gateway.observability.svc:80/loki/api/v1/push
+      otlp/tempo:
+        endpoint: tempo-distributor.observability.svc:4317
+        tls:
+          insecure: true
+    service:
+      pipelines:
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [prometheusremotewrite]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [loki]
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [otlp/tempo]

@@ -12,7 +12,8 @@ Platform capabilities on the CAPA-provisioned EKS cluster. Lab phase complete; t
 | [`argocd/`](argocd/) | GitOps: Principal + ApplicationController (Services), Agent (Workload) | Design + values |
 | [`karpenter/`](karpenter/) | **Workload only** autoscaling | Manifests |
 | [`velero/`](velero/) | Backup/restore both EKS clusters + restore drill | Design + schedules |
-| (next) peers | OpenBao, ESO, Harbor, Keycloak, CNPG, OTel, LGTM | Design bar in ARCHITECTURE |
+| [`lgtm/`](lgtm/) | **Grafana · Loki · Tempo · Mimir** + alerts (not CloudWatch) | Design + alert rules |
+| (next) peers | OpenBao, ESO, Harbor, Keycloak, CNPG | Design bar in ARCHITECTURE |
 
 ## Capacity (production floor)
 

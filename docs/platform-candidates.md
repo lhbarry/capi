@@ -60,7 +60,7 @@ Common next AWS (or AWS-adjacent) capabilities. Default question: **pin AWS**, *
 | Public TLS certificates | ACM | cert-manager + public CA / Let’s Encrypt | `candidate` | |
 | Encryption keys / CMKs | KMS | OpenBao transit; limited substitute for AWS data-plane keys | `hybrid` | **2026-07-20:** KMS CMK for EKS secrets (`aws_eks/kms` + CAPA `encryptionConfig`); OpenBao remains app secrets SoR |
 | Managed secrets (cloud) | Secrets Manager / SSM Parameter Store | OpenBao + External Secrets | `candidate` | ESO can multi-store; prefer one SoR story |
-| Cloud metrics/logs (AWS native) | CloudWatch | OTel → LGTM only | `hybrid` | **2026-07-20:** EKS CP logs (all five) → CloudWatch via CAPA; app/telemetry still OTel → LGTM target |
+| Cloud metrics/logs (AWS native) | CloudWatch | OTel → **LGTM** | `hybrid` | **LGTM primary.** EKS CP logs still land in CW (AWS-only); bridge CW→Loki. No CloudWatch Alarms baseline. |
 | Container registry (AWS) | ECR | Harbor (committed OSS) pull-through to ECR | `candidate` | Likely **hybrid** if Harbor proxies ECR |
 | L4/L7 load balancing | NLB / ALB (+ AWS LB Controller) | MetalLB / ingress-nginx only (limited on EKS) | `candidate` | EKS almost always pins AWS LBs |
 | Private service access | VPC endpoints / PrivateLink | NAT only (cost/ops tradeoff) | `candidate` | |
@@ -138,7 +138,8 @@ Move candidates here with a date and reason. Reopen only with a new need stateme
 | 2026-07-20 | Provisioning order | — | Management → Services CAPA → Workload CAPA (Turtles/CAPI/CAPA) |
 | 2026-07-17 | Argo CD, Keycloak, OAuth2 Proxy, Harbor, CNPG, OTel, LGTM | elected-oss | Services plane (see ARCHITECTURE) |
 | 2026-07-20 | KMS CMK (EKS secrets) | hybrid | CAPA encryptionConfig + `aws_eks/kms`; OpenBao for app secrets |
-| 2026-07-20 | CloudWatch (EKS CP logs) | hybrid | CAPA logging all five; LGTM still target for app telemetry |
+| 2026-07-20 | CloudWatch (EKS CP logs) | hybrid | AWS-only CP sink; **LGTM primary** for ops/alerts |
+| 2026-07-20 | CloudWatch Alarms / Container Insights | eliminated (baseline) | Replaced by Mimir/Grafana rules under aws_eks/services/lgtm/alerts |
 | 2026-07-20 | IRSA foundation | candidate (partial) | OIDC associated on CAPA EKS; per-service roles later |
 | 2026-07-20 | Management plane host | **SUSE Rancher / RKE2** | ADR-001; 3 Reserved; 4/16/100 gp3 |
 | 2026-07-20 | Management OS | **Ubuntu 24.04 LTS** | Canonical SSM AMI; not SLE Micro |

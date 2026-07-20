@@ -205,7 +205,7 @@ Karpenter (per cluster)
 | Region | kustomize param `AWS_REGION` | Per environment |
 | Node / bastion SSH | empty; bastion off | SSM only (WAF SEC) |
 | Public API CIDR | kustomize `PUBLIC_API_CIDR` | Tight allowlist; prefer private-only when mgmt in-VPC |
-| CP logging | all five → CloudWatch | Detection / audit (WAF SEC/OPS) |
+| CP logging | all five enabled (AWS → CW sink) → **bridge to Loki** | LGTM primary ops; CW not day-2 UI |
 | Secrets encryption | CMK `alias/cluster-api-provider-aws-eks-secrets` | Encryption at rest (WAF SEC) |
 | OIDC | `associateOIDCProvider: true` | IRSA / Pod Identity foundation |
 | Cost tags | Project / Environment / CostCenter / … | Attribution (WAF COST) |
@@ -379,7 +379,7 @@ Add more rows here and on the SVG as the platform grows.
 | Bootstrap workers | ≥2 multi-AZ system nodes | YAML → 2 |
 | App/platform capacity | Karpenter **5 Reserved services + 5 Reserved workload + 1.5× headroom** | Manifests in `services/karpenter` |
 | EKS API access | Private preferred; public only with tight CIDR until mgmt in-VPC | Explicit in YAML |
-| Control-plane logs | All five → CloudWatch + retention / SIEM path | YAML on; SIEM open |
+| Control-plane logs | CAPA all five on; **Loki** via bridge; SIEM optional from S3/Loki | Designed |
 | Secrets encryption | CMK (`aws_eks/kms`) | YAML + template |
 | Node access | SSM only; no bastion / no standing SSH | YAML + IAM policy |
 | Pod identity | IRSA or EKS Pod Identity **per service** | OIDC on; per-service open |
@@ -430,7 +430,8 @@ Add more rows here and on the SVG as the platform grows.
 | [docs/reliability.md](docs/reliability.md) | RTO/RPO, failure modes, REL controls |
 | [management/](management/) | Management cluster |
 | [aws_eks/](aws_eks/) | Services + Workload CAPA + platform installs |
-| [aws_reliability/](aws_reliability/) | CloudWatch alarms, quotas |
+| [aws_reliability/](aws_reliability/) | Quotas; alarms **retired** → LGTM |
+| [aws_eks/services/lgtm/](aws_eks/services/lgtm/) | Grafana Loki Tempo Mimir + alerts |
 | [docs/platform-candidates.md](docs/platform-candidates.md) | Candidate backlog |
 
 ---

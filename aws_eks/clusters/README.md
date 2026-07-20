@@ -29,7 +29,7 @@ Keep `resources: []` in this kustomization and in `services/` / `workload/` unti
 |---------|--------|
 | AZs | **3** |
 | Bootstrap workers | **2** |
-| CP logs | All five → CloudWatch |
+| CP logs | All five on (AWS CW sink) → ship to **Loki** (LGTM) |
 | Encryption | CMK `alias/cluster-api-provider-aws-eks-secrets` |
 | OIDC | On |
 | Pod CIDR | Services `10.96.0.0/16` · Workload `10.97.0.0/16` |

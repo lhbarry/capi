@@ -7,10 +7,6 @@ Parameters:
   ProjectName:
     Type: String
     Default: scke
-  RetentionDays:
-    Type: Number
-    Default: 90
-    Description: CloudWatch log retention for trail (if enabled)
 
 Resources:
   TrailBucket:
@@ -77,33 +73,8 @@ Resources:
               Bool:
                 aws:SecureTransport: false
 
-  TrailLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub /aws/cloudtrail/${ProjectName}
-      RetentionInDays: !Ref RetentionDays
-
-  TrailLogRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: cloudtrail.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: cloudtrail-to-cwl
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: !GetAtt TrailLogGroup.Arn
-
+  # CloudTrail → S3 only (LGTM-first). Optional later: S3 → Loki for Grafana query.
+  # No CloudWatch Logs destination — avoids dual ops consoles.
   AccountTrail:
     Type: AWS::CloudTrail::Trail
     DependsOn:
@@ -115,8 +86,6 @@ Resources:
       IncludeGlobalServiceEvents: true
       EnableLogFileValidation: true
       S3BucketName: !Ref TrailBucket
-      CloudWatchLogsLogGroupArn: !GetAtt TrailLogGroup.Arn
-      CloudWatchLogsRoleArn: !GetAtt TrailLogRole.Arn
       EventSelectors:
         - IncludeManagementEvents: true
           ReadWriteType: All
@@ -125,6 +94,8 @@ Resources:
           Value: !Ref ProjectName
         - Key: Environment
           Value: production
+        - Key: Observability
+          Value: lgtm-primary
 
   GuardDutyDetector:
     Type: AWS::GuardDuty::Detector

@@ -6,16 +6,17 @@ Lightweight IR process for production. Expand with contacts and tooling as you g
 
 | Asset | Location |
 |-------|----------|
-| CloudTrail | `aws_security/detection.yaml` → S3 + CWL |
+| CloudTrail | `aws_security/detection.yaml` → **S3** (CMK) |
 | GuardDuty | Same stack |
-| EKS audit logs | CAPA `logging` all five → CloudWatch |
-| Cluster snapshots | Velero (design next) + EKS etcd (managed) |
+| EKS CP / app logs | CAPA CP logging → CW (AWS sink) → **Loki**; apps → **Loki** via OTel/Fluent Bit |
+| Metrics / alerts | **Mimir + Grafana** alert rules (`aws_eks/services/lgtm/alerts/`) |
+| Cluster snapshots | Velero + EKS managed etcd |
 
 ## Detect
 
 1. GuardDuty findings (15 min publishing).  
-2. CloudTrail / CloudWatch metric filters (add alarms in follow-on).  
-3. Argo / Kubernetes audit anomalies.
+2. **Grafana / Alertmanager** (LGTM rules — node NotReady, CPU, crashloop).  
+3. Loki queries on EKS audit (after CW→Loki bridge) + Argo anomalies.
 
 ## Respond (first hour)
 

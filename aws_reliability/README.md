@@ -1,17 +1,18 @@
-# Reliability controls (AWS + docs)
+# Reliability controls
 
 | Path | Purpose |
 |------|---------|
-| [alarms.yaml](alarms.yaml) | CloudWatch alarms (EKS Container Insights + hooks) |
-| [quotas.md](quotas.md) | Service quota watchlist |
-| [../docs/reliability.md](../docs/reliability.md) | RTO/RPO, failure modes |
+| [../aws_eks/services/lgtm/](../aws_eks/services/lgtm/) | **Primary** metrics/logs/traces + **alerts** (replaces CloudWatch alarms) |
 | [../aws_eks/services/velero/](../aws_eks/services/velero/) | Backup/restore |
-| [../aws_eks/reliability/](../aws_eks/reliability/) | PDBs, topology spread |
+| [../docs/reliability.md](../docs/reliability.md) | RTO/RPO, failure modes |
+| [quotas.md](quotas.md) | Service quota watchlist |
+| [alarms.yaml](alarms.yaml) | Stub — CloudWatch alarms **removed** in favor of LGTM |
+
+## Alerting (LGTM)
 
 ```bash
-# After SNS topic exists and Container Insights enabled:
-aws cloudformation deploy \
-  --stack-name scke-reliability-alarms \
-  --template-file aws_reliability/alarms.yaml \
-  --parameter-overrides AlarmTopicArn=arn:aws:sns:...
+# After monitoring CRDs / Grafana k8s-monitoring installed on Services:
+kubectl apply -k aws_eks/services/lgtm/alerts/
 ```
+
+Rules: node NotReady, kubelet down, crashloop, CPU/memory/disk — see `lgtm/alerts/`.

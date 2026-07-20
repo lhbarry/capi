@@ -38,8 +38,9 @@ Management (Turtles/CAPA) **must** reach private EKS endpoints (same VPC, peerin
 
 | Control | Location |
 |---------|----------|
-| Audit trail | CloudTrail → S3 (CMK) + CloudWatch optional |
+| Audit trail | CloudTrail → **S3 (CMK)** only (optional later ship to **Loki**) |
 | Threat findings | GuardDuty |
 | Config drift | AWS Config recorder |
-| Cluster audit | EKS control-plane logs (all five) on CAPA |
-| Response | Runbook stub in [`incident-response.md`](incident-response.md) |
+| Cluster / app ops | **LGTM** (Grafana/Loki/Tempo/Mimir) — see `aws_eks/services/lgtm/` |
+| EKS CP logs | CAPA enables AWS CP logging (CW is AWS-only sink) → **bridge to Loki** |
+| Response | [`incident-response.md`](incident-response.md) |

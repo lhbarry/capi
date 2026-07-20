@@ -40,7 +40,7 @@
 | **Change management** | Git desired state; provision order Management → Services → Workload | Designed |
 | **Backup** | Velero schedules Services + Workload; BSL to S3; volume snapshots weekly | Designed |
 | **Recovery** | RTO/RPO table; [restore-drill.md](../aws_eks/services/velero/restore-drill.md); Management etcd + Rancher backup notes | Designed |
-| **Monitoring / alarms** | CloudWatch failed-node + CPU alarms (`aws_reliability/alarms.yaml`) | Designed |
+| **Monitoring / alarms** | **LGTM** Mimir/Grafana rules (`aws_eks/services/lgtm/alerts/`) — not CloudWatch Alarms | Designed |
 | **HA workload placement** | Argo PDBs; topology guidance; multi-AZ CAPA | Designed |
 | **Quotas** | Service quota watchlist | Designed |
 
@@ -49,7 +49,7 @@
 | Item | Notes |
 |------|-------|
 | Live Velero + first drill | Must execute quarterly log |
-| Container Insights on | Required for alarms to fire |
+| LGTM stack live | Required for alert rules to fire |
 | Multi-region DR | Explicitly deferred |
 | Chaos engineering | Optional later |
 

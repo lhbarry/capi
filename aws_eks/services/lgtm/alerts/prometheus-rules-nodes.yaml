@@ -1,0 +1,43 @@
+# Node resource alerts — replaces CloudWatch Container Insights CPU alarms
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: scke-node-resources
+  namespace: observability
+  labels:
+    scke.io/observability: lgtm
+spec:
+  groups:
+    - name: scke.nodes
+      rules:
+        - alert: SckeNodeCPUHigh
+          expr: |
+            100 * (1 - avg by (cluster, instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]))) > 80
+          for: 15m
+          labels:
+            severity: warning
+            pillar: reliability
+          annotations:
+            summary: "Node CPU > 80% ({{ $labels.instance }})"
+            description: "Replaces CloudWatch node_cpu_utilization alarms."
+
+        - alert: SckeNodeMemoryHigh
+          expr: |
+            100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 85
+          for: 15m
+          labels:
+            severity: warning
+            pillar: reliability
+          annotations:
+            summary: "Node memory > 85% ({{ $labels.instance }})"
+
+        - alert: SckeNodeDiskHigh
+          expr: |
+            100 * (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} 
+              / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) < 15
+          for: 15m
+          labels:
+            severity: warning
+            pillar: reliability
+          annotations:
+            summary: "Node disk < 15% free ({{ $labels.instance }})"

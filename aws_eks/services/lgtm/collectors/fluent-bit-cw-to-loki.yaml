@@ -1,0 +1,36 @@
+# Fluent Bit — bridge EKS control-plane logs from CloudWatch → Loki
+# AWS only writes EKS CP logs to CloudWatch; this is the LGTM-facing path.
+#
+# Options (pick one at install):
+# A) Fluent Bit with cloudwatch_logs input on a collector that has IAM read on log groups
+# B) CloudWatch subscription filter → Kinesis Firehose → HTTP Loki (or Lambda)
+#
+# Log groups (per cluster), created when CAPA logging is enabled:
+#   /aws/eks/<cluster-name>/cluster
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-cw-bridge-sketch
+  namespace: observability
+  labels:
+    scke.io/observability: lgtm
+data:
+  README: |
+    Do not use CloudWatch console as primary. Ship CP logs into Loki and query in Grafana.
+  example-filters: |
+    # Subscription filter target example (AWS side, not k8s):
+    # LogGroup: /aws/eks/capi-eks-services/cluster
+    # Destination: Firehose → Loki or Lambda → Loki
+  fluent-bit-sketch.conf: |
+    [INPUT]
+        Name              cloudwatch_logs
+        region            us-east-2
+        log_group_name    /aws/eks/capi-eks-services/cluster
+        # + workload cluster group similarly or multi-input
+
+    [OUTPUT]
+        Name   loki
+        Match  *
+        Host   loki-gateway.observability.svc
+        Port   80
+        Labels job=eks-control-plane,cluster=capi-eks-services

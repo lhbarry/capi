@@ -1,0 +1,54 @@
+# Mimir / Prometheus-compatible rules — cluster health (Services + Workload labels)
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: scke-cluster-health
+  namespace: observability
+  labels:
+    scke.io/observability: lgtm
+spec:
+  groups:
+    - name: scke.cluster
+      rules:
+        - alert: SckeNodeNotReady
+          expr: |
+            sum by (cluster) (kube_node_status_condition{condition="Ready",status="true"} == 0)
+            > 0
+          for: 10m
+          labels:
+            severity: critical
+            pillar: reliability
+          annotations:
+            summary: "Node(s) NotReady on cluster {{ $labels.cluster }}"
+            description: "At least one node is NotReady for >10m."
+            runbook: "docs/reliability.md"
+
+        - alert: SckeKubeletDown
+          expr: |
+            up{job="kubelet"} == 0
+          for: 10m
+          labels:
+            severity: critical
+            pillar: reliability
+          annotations:
+            summary: "Kubelet target down ({{ $labels.instance }})"
+
+        - alert: SckePodCrashLooping
+          expr: |
+            rate(kube_pod_container_status_restarts_total[15m]) * 60 * 15 > 3
+          for: 15m
+          labels:
+            severity: warning
+            pillar: reliability
+          annotations:
+            summary: "Pod crashlooping {{ $labels.namespace }}/{{ $labels.pod }}"
+
+        - alert: SckeDeploymentReplicasMismatch
+          expr: |
+            kube_deployment_spec_replicas != kube_deployment_status_ready_replicas
+          for: 15m
+          labels:
+            severity: warning
+            pillar: reliability
+          annotations:
+            summary: "Deployment replica mismatch {{ $labels.namespace }}/{{ $labels.deployment }}"
