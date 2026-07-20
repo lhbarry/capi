@@ -1,0 +1,6 @@
+# Cluster security baselines — apply to Services and Workload as noted.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespaces-pss.yaml
+  - networkpolicy-argocd-services.yaml

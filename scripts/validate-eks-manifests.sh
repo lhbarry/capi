@@ -21,7 +21,6 @@ configMapGenerator:
     namespace: default
     literals:
       - AWS_REGION=us-east-2
-      - PUBLIC_API_CIDR=203.0.113.10/32
     options:
       disableNameSuffixHash: true
 replacements:
@@ -34,15 +33,6 @@ replacements:
           kind: AWSManagedControlPlane
         fieldPaths:
           - spec.region
-  - source:
-      kind: ConfigMap
-      name: capa-eks-cluster-params
-      fieldPath: data.PUBLIC_API_CIDR
-    targets:
-      - select:
-          kind: AWSManagedControlPlane
-        fieldPaths:
-          - spec.endpointAccess.publicCIDRs.0
 KUST
   local out="$dir/out.yaml"
   kubectl kustomize "$dir" > "$out"
@@ -54,14 +44,16 @@ KUST
     "associateOIDCProvider: true" \
     "sshKeyName: \"\"" \
     "alias/cluster-api-provider-aws-eks-secrets" \
-    "availabilityZoneUsageLimit: 3"
+    "availabilityZoneUsageLimit: 3" \
+    "public: false" \
+    "encrypted: true"
   do
     if ! grep -q "$needle" "$out"; then
-      echo "FAIL $name: missing harden marker: $needle" >&2
+      echo "FAIL $name: missing SEC/harden marker: $needle" >&2
       exit 1
     fi
   done
-  echo "harden markers OK $name"
+  echo "SEC harden markers OK $name"
 
   if kubectl get crd awsmanagedcontrolplanes.controlplane.cluster.x-k8s.io >/dev/null 2>&1; then
     kubectl apply --dry-run=server -f "$out" >/dev/null
@@ -74,7 +66,6 @@ KUST
 build_one services "$ROOT/aws_eks/clusters/services/cluster.yaml"
 build_one workload "$ROOT/aws_eks/clusters/workload/cluster.yaml"
 
-# Parent and children must stay empty in pure-dev
 for f in \
   "$ROOT/aws_eks/clusters/kustomization.yaml" \
   "$ROOT/aws_eks/clusters/services/kustomization.yaml" \
@@ -85,11 +76,11 @@ do
     exit 2
   fi
 done
-echo "repo resources: [] OK (parent + services + workload)"
+echo "repo resources: [] OK"
 
-# Management is third cluster (not CAPA YAML here)
-test -f "$ROOT/management/README.md"
-test -f "$ROOT/docs/clusters.md"
-echo "three-cluster map present"
+test -f "$ROOT/aws_security/detection.yaml"
+test -f "$ROOT/aws_iam/karpenter-irsa.yaml"
+test -f "$ROOT/aws_eks/security/namespaces-pss.yaml"
+echo "SEC packages present"
 
 echo "ALL CHECKS PASSED (local only)"

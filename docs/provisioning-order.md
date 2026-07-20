@@ -37,12 +37,15 @@
 
 CAPA applies only what is in git under `aws_eks/clusters/{services,workload}/` when those paths are enabled and applied to the Management cluster API (kubectl/Helm/GitOps from Management — **not** experimental Kind Flux as production).
 
-## After cluster create
+## Security baseline (with create)
 
 | When | Action |
 |------|--------|
-| After **Services** Ready | Install Argo Principal + ApplicationController; platform peers (no Karpenter on Services) |
-| After **Workload** Ready | Install **Karpenter** (Workload only); Argo **Agent** pointing at Services Principal |
+| Before CAPA EKS | Deploy `aws_security/detection.yaml` + `aws_eks/kms` + CAPA IAM |
+| After **Services** Ready | Argo Principal + ApplicationController; `aws_eks/security` NetworkPolicies/PSS; platform peers (**no Karpenter**) |
+| After **Workload** Ready | `aws_iam/karpenter-irsa.yaml`; **Karpenter**; Argo **Agent**; PSS namespaces |
+
+Private EKS API only — Management network path required (VPC/peering/TGW).
 
 ## Karpenter placement (locked)
 
@@ -53,4 +56,4 @@ Services capacity is **CAPA MachineDeployment** Reserved nodes (fixed floor), no
 
 - Keep CAPA kustomize `resources: []` until step 2/3 is intentional.  
 - Do not create Workload before Services if Agent must register to Principal.  
-- IAM (`aws_iam/`) + KMS (`aws_eks/kms/`) before first CAPA EKS create.
+- IAM (`aws_iam/`) + KMS (`aws_eks/kms/`) + **detection** before first CAPA EKS create.

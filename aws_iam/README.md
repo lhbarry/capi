@@ -80,7 +80,26 @@ clusterawsadm bootstrap iam print-cloudformation-template > /tmp/capa-iam-monoli
 # re-cut into the three files above; never treat monolith create as GitOps source
 ```
 
+## Karpenter IRSA (Workload only)
+
+After Workload OIDC exists:
+
+```bash
+# Resolve issuer from cluster, create OIDC provider if CAPA associateOIDCProvider did not
+aws cloudformation deploy \
+  --stack-name scke-karpenter-irsa \
+  --template-file aws_iam/karpenter-irsa.yaml \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides \
+    OIDCProviderArn=arn:aws:iam::ACCOUNT:oidc-provider/oidc.eks.REGION.amazonaws.com/id/XXXX \
+    OIDCIssuerHostPath=oidc.eks.REGION.amazonaws.com/id/XXXX \
+    ClusterName=capi-eks-workload
+```
+
+Annotate `karpenter/karpenter` ServiceAccount with the output role ARN.
+
 ## Related
 
-- [`aws_ec2/`](../aws_ec2/) — self-managed CAPA clusters  
+- [`aws_security/`](../aws_security/) — CloudTrail, GuardDuty, Config  
 - [`aws_eks/`](../aws_eks/) — EKS CAPA clusters  
+

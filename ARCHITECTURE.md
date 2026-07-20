@@ -53,22 +53,20 @@ Design and implement **production-grade create/manage of EKS on AWS** with:
 
 ### 1.2 Well-Architected score — design to date (2026-07-20)
 
-Score reflects **in-repo production design + evidence**, not fully deployed live platform. Criticality: production. Calibration: design maturity vs runtime proof.
+Score reflects **in-repo production design + evidence**, not fully deployed live platform. Criticality: production.
 
 | Pillar | Score | Critical | High | Notes |
 |--------|------:|---------:|-----:|-------|
-| Operational Excellence | **3.2** | 0 | 2 | GitOps YAML, three-cluster order, Argo topology, Turtles/CAPA path documented; CI gates / runbooks incomplete |
-| Security | **2.8** | 0 | 3 | CP logs, CMK, OIDC, SSM, endpoint allowlist in CAPA YAML; detection, IRSA per service, SIEM still open |
-| Reliability | **3.0** | 0 | 2 | 3 AZ, dual EKS, mgmt 3-node, Services 5 CAPA reserved, Workload Karpenter+headroom; Velero drills not designed yet |
-| Performance Efficiency | **2.7** | 0 | 1 | Karpenter on Workload only; Services fixed CAPA size; no metrics process yet |
-| Cost Optimization | **2.8** | 0 | 1 | Tags, budget template, intentional Reserved floors; budgets not deployed; dual EKS cost real |
-| Sustainability | **2.6** | 0 | 1 | Headroom/Karpenter on Workload; Services fixed 5; region/carbon process open |
+| Operational Excellence | **3.2** | 0 | 2 | Three-cluster order, Argo/Turtles path; CI gates incomplete |
+| **Security** | **4.1** | 0 | 1 | Private EKS API, CMK, encrypted volumes, CloudTrail/GuardDuty/Config, IRSA for Karpenter, PSS + NetworkPolicy, IR stub — see [docs/wa-scorecard.md](docs/wa-scorecard.md) |
+| Reliability | **3.0** | 0 | 2 | HA topology designed; Velero drills open |
+| Performance Efficiency | **2.7** | 0 | 1 | Workload Karpenter; no metrics process |
+| Cost Optimization | **2.8** | 0 | 1 | Tags + budget template; undeployed |
+| Sustainability | **2.6** | 0 | 1 | Workload elasticity; Services static |
 
-**Overall (design): ~2.9 / 5** (up from lab ~2.1 and interim ~2.6).  
+**Overall (design): ~3.2 / 5** · **Security ≥ 4.0 achieved (design).**  
 
-**Target gap:** mainly runtime install (Management → Services → Workload), IRSA, Velero+restore, detection, Argo/Karpenter live, CI policy gates → path to **≥ 3.8**.
-
-Full narrative scorecard: [docs/wa-scorecard.md](docs/wa-scorecard.md).
+**Path to overall ≥ 3.8:** live install order, Velero+restore, detection deployed, CI gates, ops metrics.
 
 ---
 

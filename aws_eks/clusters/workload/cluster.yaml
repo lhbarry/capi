@@ -52,10 +52,9 @@ spec:
     enabled: false
   associateOIDCProvider: true
   endpointAccess:
+    # Private-only Kubernetes API (SEC). Management CAPA must reach via VPC/peering/TGW/PrivateLink.
     private: true
-    public: true
-    publicCIDRs:
-    - PLACEHOLDER_PUBLIC_API_CIDR
+    public: false
   logging:
     apiServer: true
     audit: true
@@ -121,6 +120,10 @@ spec:
       instanceType: t3.large
       sshKeyName: ""
       publicIP: false
+      rootVolume:
+        size: 50
+        type: gp3
+        encrypted: true
       cloudInit:
         insecureSkipSecretsManager: true
       additionalTags:

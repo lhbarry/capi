@@ -1,0 +1,131 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Karpenter controller IRSA for Workload EKS (capi-eks-workload only).
+  Deploy after OIDC provider exists. Not Flux-applied.
+
+Parameters:
+  OIDCProviderArn:
+    Type: String
+    Description: arn:aws:iam::ACCOUNT:oidc-provider/oidc.eks.REGION.amazonaws.com/id/EXAMPLED539D4633
+  OIDCIssuerHostPath:
+    Type: String
+    Description: >
+      Issuer host path without https://
+      e.g. oidc.eks.us-east-2.amazonaws.com/id/EXAMPLED539D4633
+  ServiceAccountNamespace:
+    Type: String
+    Default: karpenter
+  ServiceAccountName:
+    Type: String
+    Default: karpenter
+  ClusterName:
+    Type: String
+    Default: capi-eks-workload
+  ProjectName:
+    Type: String
+    Default: scke
+  InterruptionQueueArn:
+    Type: String
+    Default: "*"
+    Description: SQS queue ARN for interruptions, or * until queue exists
+
+Resources:
+  KarpenterControllerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-karpenter-controller
+      AssumeRolePolicyDocument: !Sub
+        - |
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": { "Federated": "${OIDCProviderArn}" },
+                "Action": "sts:AssumeRoleWithWebIdentity",
+                "Condition": {
+                  "StringEquals": {
+                    "${OIDCIssuerHostPath}:aud": "sts.amazonaws.com",
+                    "${OIDCIssuerHostPath}:sub": "system:serviceaccount:${ServiceAccountNamespace}:${ServiceAccountName}"
+                  }
+                }
+              }
+            ]
+          }
+        - OIDCProviderArn: !Ref OIDCProviderArn
+          OIDCIssuerHostPath: !Ref OIDCIssuerHostPath
+          ServiceAccountNamespace: !Ref ServiceAccountNamespace
+          ServiceAccountName: !Ref ServiceAccountName
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: production
+        - Key: Purpose
+          Value: karpenter-irsa
+        - Key: Cluster
+          Value: !Ref ClusterName
+
+  KarpenterControllerPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub ${ProjectName}-karpenter-controller
+      Roles:
+        - !Ref KarpenterControllerRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: Compute
+            Effect: Allow
+            Action:
+              - ec2:CreateFleet
+              - ec2:CreateLaunchTemplate
+              - ec2:CreateTags
+              - ec2:DescribeAvailabilityZones
+              - ec2:DescribeImages
+              - ec2:DescribeInstances
+              - ec2:DescribeInstanceTypeOfferings
+              - ec2:DescribeInstanceTypes
+              - ec2:DescribeLaunchTemplates
+              - ec2:DescribeSecurityGroups
+              - ec2:DescribeSpotPriceHistory
+              - ec2:DescribeSubnets
+              - ec2:DeleteLaunchTemplate
+              - ec2:RunInstances
+              - ec2:TerminateInstances
+            Resource: "*"
+          - Sid: ConditionalTerminate
+            Effect: Allow
+            Action:
+              - ec2:TerminateInstances
+            Resource: "*"
+            Condition:
+              StringLike:
+                ec2:ResourceTag/karpenter.sh/nodepool: "*"
+          - Sid: PassNodeRole
+            Effect: Allow
+            Action: iam:PassRole
+            Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/nodes.cluster-api-provider-aws.sigs.k8s.io
+          - Sid: EKSCluster
+            Effect: Allow
+            Action: eks:DescribeCluster
+            Resource: !Sub arn:aws:eks:${AWS::Region}:${AWS::AccountId}:cluster/${ClusterName}
+          - Sid: PricingSSM
+            Effect: Allow
+            Action:
+              - pricing:GetProducts
+              - ssm:GetParameter
+            Resource: "*"
+          - Sid: InterruptionQueue
+            Effect: Allow
+            Action:
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+              - sqs:GetQueueUrl
+              - sqs:ReceiveMessage
+            Resource: !Ref InterruptionQueueArn
+
+Outputs:
+  KarpenterControllerRoleArn:
+    Description: Annotate ServiceAccount karpenter/karpenter with eks.amazonaws.com/role-arn
+    Value: !GetAtt KarpenterControllerRole.Arn

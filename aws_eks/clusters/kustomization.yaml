@@ -1,27 +1,22 @@
 # CAPA EKS cluster definitions (Services + Workload).
 # Management cluster is NOT here — see management/ (Rancher/RKE2).
 #
-# SAFETY: keep nested and parent resources empty until intentional promotion.
-# Enabling + apply via CAPA creates real EKS (3 AZ production floor each).
-#
-# Three-cluster map: docs/clusters.md
+# SAFETY: keep resources empty until intentional promotion.
+# Provision order: Management → Services → Workload (docs/provisioning-order.md)
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Parent does not nest-enable children by default. Enable per-cluster kustomizations
-# or list cluster.yaml files here when promoting, e.g.:
+resources: []
+# When promoting:
 #   resources:
 #     - services/cluster.yaml
 #     - workload/cluster.yaml
-resources: []
 
 configMapGenerator:
   - name: capa-eks-cluster-params
     namespace: default
     literals:
       - AWS_REGION=us-east-2
-      # Shared allowlist for public EKS API until private-only; never 0.0.0.0/0 in shared accounts.
-      - PUBLIC_API_CIDR=YOUR_PUBLIC_IP/32
     options:
       disableNameSuffixHash: true
       labels:
@@ -37,12 +32,3 @@ replacements:
           kind: AWSManagedControlPlane
         fieldPaths:
           - spec.region
-  - source:
-      kind: ConfigMap
-      name: capa-eks-cluster-params
-      fieldPath: data.PUBLIC_API_CIDR
-    targets:
-      - select:
-          kind: AWSManagedControlPlane
-        fieldPaths:
-          - spec.endpointAccess.publicCIDRs.0
