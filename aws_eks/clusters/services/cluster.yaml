@@ -73,7 +73,6 @@ spec:
     CostCenter: scke
     Phase: production-design
     capacity.scke.io/plane: services
-    karpenter.sh/discovery: capi-eks-services
   network:
     vpc:
       availabilityZoneUsageLimit: 3
