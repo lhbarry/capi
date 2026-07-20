@@ -10,9 +10,9 @@ Not wired to Flux:
 export AWS_REGION="${AWS_REGION:-us-east-2}"
 
 aws cloudformation deploy \
-  --stack-name scke-lab-budget \
+  --stack-name scke-production-budget \
   --template-file aws_cost/production-budget.yaml \
-  --parameter-overrides MonthlyBudgetAmount=50 AlertEmail=you@example.com \
+  --parameter-overrides MonthlyBudgetAmount=500 AlertEmail=you@example.com \
   --no-fail-on-empty-changeset
 ```
 
@@ -20,4 +20,4 @@ aws cloudformation deploy \
 
 ## Tags
 
-Cluster resources use `CostCenter=scke-lab` (and related tags) on CAPA objects. Budget here is account-level monthly cost unless you later add cost filters by tag.
+Cluster resources use `CostCenter=scke`, `Environment=production` on CAPA/Karpenter objects. Budget is account-level monthly cost unless you later filter by tag.
