@@ -1,0 +1,15 @@
+# /etc/rancher/rke2/config.yaml on the FIRST server node
+# Copy and set tls-san to NLB DNS / Rancher hostname.
+#
+# Pin: INSTALL_RKE2_VERSION=v1.34.9+rke2r1  (see management/VERSIONS.md)
+
+write-kubeconfig-mode: "0644"
+tls-san:
+  - rancher.example.com
+  - REPLACE_NLB_DNS_NAME
+# token: set explicitly or let first node generate and copy to join nodes
+# token: "PRESHARED_TOKEN"
+
+node-label:
+  - "capacity.scke.io/reservation=reserved"
+  - "capacity.scke.io/plane=management"

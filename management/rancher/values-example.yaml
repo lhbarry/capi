@@ -1,0 +1,13 @@
+# Helm values sketch for rancher-stable/rancher chart 2.14.3
+# hostname must match TLS and DNS → NLB
+
+hostname: rancher.example.com
+replicas: 3
+bootstrapPassword: "CHANGE_ME"
+
+# Ingress uses RKE2 bundled ingress by default on local cluster
+# ingress:
+#   tls:
+#     source: secret  # or rancher / letsEncrypt per docs
+
+# Prime customers: follow SUSE Prime chart/registry overrides instead of only public stable.

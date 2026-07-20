@@ -1,0 +1,317 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  SCKE management plane day-0 EC2: 3× Ubuntu 24.04 RKE2 servers (4 vCPU/16 GiB/100 GiB gp3),
+  SSM access, NLB for Kubernetes API. Does not install RKE2/Rancher (see management/bootstrap.md).
+  Not applied by Flux.
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  SubnetIdAz1:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private subnet AZ1
+  SubnetIdAz2:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private subnet AZ2
+  SubnetIdAz3:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private subnet AZ3
+  InstanceType:
+    Type: String
+    Default: m7i.xlarge
+    AllowedValues:
+      - m7i.xlarge
+      - m6i.xlarge
+      - m5.xlarge
+    Description: Locked shape 4 vCPU / 16 GiB (m7i preferred)
+  ProjectName:
+    Type: String
+    Default: scke
+  AllowedCidrApi:
+    Type: String
+    Default: 10.0.0.0/8
+    Description: CIDR allowed to reach NLB Kubernetes API (6443). Tighten to VPN/office.
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+    Description: Canonical Ubuntu 24.04 LTS (amd64, gp3)
+
+Resources:
+  ManagementInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-management-rke2-node
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: production
+        - Key: capacity.scke.io/plane
+          Value: management
+
+  ManagementInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub ${ProjectName}-management-rke2-node
+      Roles:
+        - !Ref ManagementInstanceRole
+
+  ManagementSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: RKE2 management servers + NLB targets
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        # NLB health + API (NLB preserves client IP for instance targets depending on type;
+        # also allow VPC CIDR for node-to-node below)
+        - IpProtocol: tcp
+          FromPort: 6443
+          ToPort: 6443
+          CidrIp: !Ref AllowedCidrApi
+          Description: Kubernetes API
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref AllowedCidrApi
+          Description: Rancher HTTPS via node ingress
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-management-rke2-sg
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # Node-to-node RKE2 / etcd / CNI (self-referencing SG)
+  ManagementSGIngressSelf:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref ManagementSecurityGroup
+      IpProtocol: -1
+      SourceSecurityGroupId: !Ref ManagementSecurityGroup
+      Description: All traffic between management RKE2 nodes
+
+  ManagementSGFromNlb:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref ManagementSecurityGroup
+      IpProtocol: tcp
+      FromPort: 6443
+      ToPort: 6443
+      SourceSecurityGroupId: !Ref NlbSecurityGroup
+      Description: NLB to kube-apiserver
+
+  ManagementSGFromNlbHttps:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref ManagementSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      SourceSecurityGroupId: !Ref NlbSecurityGroup
+      Description: NLB to Rancher ingress
+
+  NlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: NLB front door for management API/UI
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 6443
+          ToPort: 6443
+          CidrIp: !Ref AllowedCidrApi
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref AllowedCidrApi
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-management-nlb-sg
+        - Key: Project
+          Value: !Ref ProjectName
+
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub ${ProjectName}-management-rke2
+      LaunchTemplateData:
+        ImageId: !Ref LatestAmiId
+        InstanceType: !Ref InstanceType
+        IamInstanceProfile:
+          Arn: !GetAtt ManagementInstanceProfile.Arn
+        SecurityGroupIds:
+          - !Ref ManagementSecurityGroup
+        BlockDeviceMappings:
+          - DeviceName: /dev/sda1
+            Ebs:
+              VolumeSize: 100
+              VolumeType: gp3
+              Encrypted: true
+              DeleteOnTermination: true
+        MetadataOptions:
+          HttpTokens: required
+          HttpPutResponseHopLimit: 2
+          HttpEndpoint: enabled
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Sub ${ProjectName}-management-rke2
+              - Key: Project
+                Value: !Ref ProjectName
+              - Key: Environment
+                Value: production
+              - Key: ManagedBy
+                Value: cloudformation
+              - Key: capacity.scke.io/reservation
+                Value: reserved
+              - Key: capacity.scke.io/plane
+                Value: management
+              - Key: Role
+                Value: rke2-server
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            set -euo pipefail
+            # IMDSv2 (HttpTokens required on this launch template)
+            # $$ → literal $ for bash after Fn::Sub
+            TOKEN=$$(curl -sX PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+            IID=$$(curl -s -H "X-aws-ec2-metadata-token: $$TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+            hostnamectl set-hostname ${ProjectName}-mgmt-$$IID
+            # RKE2/Rancher installed out-of-band per management/bootstrap.md
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update -y
+            apt-get install -y jq curl
+
+  Server1:
+    Type: AWS::EC2::Instance
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      SubnetId: !Ref SubnetIdAz1
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-management-rke2-1
+
+  Server2:
+    Type: AWS::EC2::Instance
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      SubnetId: !Ref SubnetIdAz2
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-management-rke2-2
+
+  Server3:
+    Type: AWS::EC2::Instance
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      SubnetId: !Ref SubnetIdAz3
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-management-rke2-3
+
+  ApiTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${ProjectName}-mgmt-k8s-api
+      Port: 6443
+      Protocol: TCP
+      VpcId: !Ref VpcId
+      TargetType: instance
+      HealthCheckProtocol: TCP
+      HealthCheckPort: "6443"
+      Targets:
+        - Id: !Ref Server1
+          Port: 6443
+        - Id: !Ref Server2
+          Port: 6443
+        - Id: !Ref Server3
+          Port: 6443
+
+  HttpsTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${ProjectName}-mgmt-https
+      Port: 443
+      Protocol: TCP
+      VpcId: !Ref VpcId
+      TargetType: instance
+      HealthCheckProtocol: TCP
+      HealthCheckPort: "443"
+      Targets:
+        - Id: !Ref Server1
+          Port: 443
+        - Id: !Ref Server2
+          Port: 443
+        - Id: !Ref Server3
+          Port: 443
+
+  NetworkLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub ${ProjectName}-management
+      Type: network
+      Scheme: internal
+      Subnets:
+        - !Ref SubnetIdAz1
+        - !Ref SubnetIdAz2
+        - !Ref SubnetIdAz3
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: capacity.scke.io/plane
+          Value: management
+
+  ListenerApi:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref NetworkLoadBalancer
+      Port: 6443
+      Protocol: TCP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ApiTargetGroup
+
+  ListenerHttps:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref NetworkLoadBalancer
+      Port: 443
+      Protocol: TCP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref HttpsTargetGroup
+
+Outputs:
+  AmiId:
+    Description: Resolved Ubuntu 24.04 AMI
+    Value: !Ref LatestAmiId
+  InstanceType:
+    Value: !Ref InstanceType
+  Server1Id:
+    Value: !Ref Server1
+  Server2Id:
+    Value: !Ref Server2
+  Server3Id:
+    Value: !Ref Server3
+  NlbDnsName:
+    Description: Internal NLB DNS — use in RKE2 tls-san and kubeconfig
+    Value: !GetAtt NetworkLoadBalancer.DNSName
+  InstanceProfileArn:
+    Value: !GetAtt ManagementInstanceProfile.Arn
+  SecurityGroupId:
+    Value: !Ref ManagementSecurityGroup

@@ -352,7 +352,7 @@ Add more rows here and on the SVG as the platform grows.
 
 | Dimension | Production design (target in-repo) | Status |
 |-----------|-----------------------------------|--------|
-| Management plane | **SUSE Rancher / RKE2** on **Ubuntu latest stable LTS**, **3 × (4/16/100 gp3)**, multi-AZ | Host + OS + shape **locked** (ADR-001); region AMI ID open |
+| Management plane | **Rancher v2.14.3** / **RKE2 v1.34.9+rke2r1** / **Ubuntu 24.04** / **3× m7i.xlarge** (4/16/100 gp3) | **Locked** ADR-001 + [management/VERSIONS.md](management/VERSIONS.md); day-0 in `management/` |
 | Cluster lifecycle | CAPA → EKS + policy gates + promotion envs | CAPA YAML present; gates open |
 | Services / app CD | Argo CD HA on Services plane | Design; manifests next |
 | VPC / AZ | **3 AZs**; VPC endpoints vs NAT as cost/security tradeoff | YAML → 3 AZ |
@@ -419,7 +419,7 @@ Add more rows here and on the SVG as the platform grows.
 **Current phase:** production design for **high WAF score**. Prefer order:
 
 1. Lock production substrate (3 AZ, bootstrap HA, CMK, endpoint, tags) — **in progress in YAML**  
-2. **Management plane** — SUSE Rancher / RKE2 on **Ubuntu latest stable LTS**, **3 × 4/16/100 gp3** (**locked** ADR-001); pin region AMI ID + instance type; day-0 IaC  
+2. **Management plane** — pins + day-0 IaC in `management/` (**design done**); deploy VPC/DNS/TLS + bootstrap when ready  
 3. **Karpenter** production path — NodePools + Reserved 5/5 + 1.5× headroom (**manifests present**; controller IRSA + discovery tags next)  
 4. **Argo CD** Principal + Agent (Services) — unlocks the rest of the plane  
 5. Peer services via Argo: secrets (OpenBao+ESO), IdP, Harbor, CNPG, Velero, OTel+LGTM  

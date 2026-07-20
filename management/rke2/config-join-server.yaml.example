@@ -1,0 +1,12 @@
+# /etc/rancher/rke2/config.yaml on servers 2 and 3
+# INSTALL_RKE2_VERSION=v1.34.9+rke2r1
+
+server: https://REPLACE_FIRST_SERVER_PRIVATE_IP:9345
+token: "REPLACE_CLUSTER_TOKEN"
+tls-san:
+  - rancher.example.com
+  - REPLACE_NLB_DNS_NAME
+
+node-label:
+  - "capacity.scke.io/reservation=reserved"
+  - "capacity.scke.io/plane=management"

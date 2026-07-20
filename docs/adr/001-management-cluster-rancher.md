@@ -102,11 +102,14 @@ Downstream EKS (Services + Workload)
 ## Open items
 
 1. ~~Hardware profile~~ → **locked 4 / 16 / 100 gp3**  
-2. ~~OS family~~ → **Ubuntu latest stable (LTS)**  
-3. Pin **Rancher version** + matching **RKE2 version** → re-check Ubuntu LTS on matrix → lock **region AMI ID**  
-4. Exact instance type (`m7i.xlarge` vs `m6i.xlarge`, etc.)  
-5. Day-0 bootstrap procedure (Terraform/CFN/Ansible + RKE2 install on Ubuntu)  
-6. Where CAPI/CAPA install lands relative to Rancher (local cluster apps)
+2. ~~OS family~~ → **Ubuntu 24.04 LTS** (latest stable LTS track)  
+3. ~~Rancher / RKE2 pins~~ → **Rancher v2.14.3** + **RKE2 v1.34.9+rke2r1** ([management/VERSIONS.md](../../management/VERSIONS.md))  
+4. ~~Instance type~~ → **`m7i.xlarge`** (fallback `m6i.xlarge`)  
+5. ~~AMI resolution~~ → Canonical SSM parameter (example `us-east-2`: `ami-0dc6aa44dbcdd872e` @ 2026-07-20)  
+6. ~~Day-0 bootstrap~~ → [management/bootstrap.md](../../management/bootstrap.md) + [management/infra/](../../management/infra/)  
+7. ~~CAPI/CAPA placement~~ → **local RKE2 cluster** under Rancher ([management/capa-placement.md](../../management/capa-placement.md))  
+
+**Remaining (implementation / env-specific):** VPC choice, DNS/TLS for Rancher hostname, CAPA IAM attachment to management instance role, intentional EKS apply, optional Ubuntu Pro.
 
 ## References
 
