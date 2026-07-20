@@ -9,7 +9,7 @@ Platform capabilities on the CAPA-provisioned EKS cluster. Lab phase complete; t
 | Path | Purpose | Status |
 |------|---------|--------|
 | [`karpenter/`](karpenter/) | Compute — Reserved 5/5 + 1.5× headroom | Manifests present |
-| (next) Argo CD | GitOps CD Principal + Agent | Design in ARCHITECTURE §7 |
+| [`argocd/`](argocd/) | GitOps: **Principal + ApplicationController** (Services), **Agent** (Workload, independent) | Design + values |
 | (next) peers | Velero, OpenBao, ESO, Harbor, Keycloak, CNPG, OTel, LGTM | Design bar in ARCHITECTURE §7 |
 
 ## Capacity (production floor)

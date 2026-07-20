@@ -1,0 +1,6 @@
+# Placeholder for rendered/ helm-post-renderer manifests if vendored later.
+# Preferred install path: Helm with values-principal.yaml (see ../install.md).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources: []
+# When vendoring: add helm-generated YAML here; keep resources empty until intentional apply.

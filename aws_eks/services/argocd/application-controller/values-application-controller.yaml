@@ -1,0 +1,22 @@
+# Overlay for application-controller on Services (merge with principal values)
+
+controller:
+  # Services ApplicationController — HA when ready
+  replicas: 1
+  # dynamicClusterDistribution / sharding: use when many Applications
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      memory: 2Gi
+  nodeSelector:
+    capacity.scke.io/plane: services
+  tolerations:
+    - key: capacity.scke.io/plane
+      operator: Equal
+      value: services
+      effect: NoSchedule
+
+# Workload Applications are NOT primarily reconciled here.
+# Workload uses the Agent on the Workload cluster (local controller path).

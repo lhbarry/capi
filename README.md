@@ -26,7 +26,7 @@ Arch. adaptation from On-Prem to AWS Cloud Services Hosting — **Cluster API + 
 
 | Industry capability | Team name | Stack |
 |---------------------|-----------|--------|
-| Continuous delivery (GitOps CD) | CI/CD | Argo CD **Principal** + **Agent** |
+| Continuous delivery (GitOps CD) | CI/CD | Argo CD: **Principal + ApplicationController** (Services), **Agent** (Workload, independent). [`aws_eks/services/argocd/`](aws_eks/services/argocd/) |
 | Node autoscaling | Compute | Karpenter — **5 Reserved** services + **5 Reserved** workload + **1.5× worker** headroom; mgmt **3 Reserved**. [`aws_eks/services/karpenter/`](aws_eks/services/karpenter/) |
 | Backup & restore (also Workload) | Resilience | Velero |
 | Secrets management | Secrets | OpenBao |

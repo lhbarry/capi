@@ -245,49 +245,56 @@ Industry names are primary; **team names** in parentheses for local vocabulary.
 | **Telemetry collection** (instrumentation pipeline) | Obs. Infra | [OpenTelemetry](https://opentelemetry.io/) | SDKs + Collector: traces, metrics, logs → backends |
 | **Observability backend** (LGTM stack) | Observability | Grafana · Loki · Tempo · Mimir | Viz + logs + traces + metrics (long-term metrics via Mimir) |
 
-### CI/CD — Argo CD Principal and Agent
+### CI/CD — Argo CD Principal, ApplicationController, Agent
 
-Industry language: **GitOps continuous delivery** with Principal (hub/control) + Agent (in-cluster reconciler). Team name: **CI/CD**.
+Industry language: **GitOps continuous delivery**. Team name: **CI/CD**.  
+**Design tree:** [`aws_eks/services/argocd/`](aws_eks/services/argocd/)
 
-| Component | Industry terms | Placement | Responsibility |
-|-----------|----------------|-----------|----------------|
-| **Argo CD Principal** | Control plane · hub | **Services plane** | Applications / ApplicationSets, git, UI/API, RBAC |
-| **Argo CD Agent** | Cluster agent · spoke reconciler | **Workload plane** *and* **Services plane** | Applies/reconciles on EKS (workload substrate + services/apps) |
+| Component | Placement | Responsibility |
+|-----------|-----------|----------------|
+| **Principal** | **Services cluster** | Hub control plane: UI/API, git, RBAC, agent Principal; single pane of glass |
+| **ApplicationController** | **Services cluster** | Reconciles **Services-plane** Applications (local to Services) |
+| **Agent** | **Workload cluster** | Local reconcile of **Workload** apps; **reports** to Principal; **operates independently** if Principal is down |
 
 ```text
-  Workload plane:  Network · EKS CP · Workers · Argo Agent · Knative · Velero
-  Services plane:  Argo Principal ◄──► Argo Agent · Karpenter · Velero · peers (IdP, Harbor, secrets, …)
+  Services cluster:  Principal + ApplicationController · Karpenter · platform peers
+  Workload cluster:  Agent (→ reports to Principal) · Knative · apps · Velero (also Services)
 ```
 
 | Concern | Choice |
 |---------|--------|
-| EKS cluster lifecycle | CAPA (management host **TBD**) |
-| Principal | Services plane only |
-| Agent | Workload plane **and** Services plane |
-| Karpenter | **Services plane** (cluster compute autoscaling for the EKS node pool) |
-| Knative | **Workload plane** (app runtime substrate) |
-| Velero | **Workload plane** *and* **Services plane** (backup platform + cluster data) |
-| Delivery of other services + applications | Argo CD (once present) |
-| Auth to Argo UI | Keycloak OIDC + OAuth2 Proxy (peer services) |
-| Image pulls | Harbor (peer service) |
+| EKS cluster lifecycle | CAPA from **Rancher/RKE2 management** ([ADR-001](docs/adr/001-management-cluster-rancher.md)) |
+| Principal + ApplicationController | **Services only** |
+| Agent | **Workload only** (independent operation + status report) |
+| Karpenter | **Services plane** (cluster compute for EKS node pools) |
+| Knative | **Workload plane** |
+| Velero | Workload + Services |
+| Auth to Argo UI | Keycloak OIDC + OAuth2 Proxy (Services) |
+| Image pulls | Harbor (Services) |
 
-**CI vs CD:** “CI/CD” here emphasizes **CD** (Argo CD). Build/test pipelines (CI) can feed images into **Harbor** and git manifests that Argo reconciles; CI tooling is not fixed in this document yet.
+**Independence:** Workload Agent continues applying known desired state when Principal is unreachable; re-syncs status when the hub returns. See [argocd/architecture.md](aws_eks/services/argocd/architecture.md).
+
+**CI vs CD:** “CI/CD” emphasizes **CD** (Argo CD). CI feeds **Harbor** + git; CI tooling not fixed here.
 
 ### How they relate
 
 ```text
-  Workload plane:  Network · EKS CP · Workers · Argo Agent · Knative · Velero
-  Services plane:  Git ──► Argo Principal ◄──► Argo Agent ──► apps/svc
-                              │
-                              └── UI ◄── OAuth2 Proxy ◄── Keycloak
-                   Karpenter ──► EC2 nodes · Velero (also Workload) · OpenBao ◄── ESO
-                   CI ──► Harbor · Apps ──► CNPG · OTel ──► LGTM
-  Side surfaces:   On Prem (AD/LDAP · SMTP · MS Teams) · AWS (EFS CSI RWX · EBS CSI block · S3)
+  Workload:  Network · EKS · Workers · Argo Agent · Knative · Velero
+  Services:  Git ──► Argo Principal + ApplicationController ──► services apps
+                      ▲
+                      │ report / intent (agent protocol)
+                      │
+                 Argo Agent (Workload) ──► workload apps (local apply)
+                      UI ◄── OAuth2 Proxy ◄── Keycloak
+             Karpenter ──► EC2 · Velero · OpenBao ◄── ESO
+             CI ──► Harbor · CNPG · OTel ──► LGTM
+  Side surfaces:   On Prem · AWS (EFS/EBS/S3)
 ```
 
 | Flow | Components |
 |------|------------|
-| Deploy services/apps | Git → Argo CD Principal → Agent (Workload + Services) on EKS |
+| Deploy Services apps | Git → Principal + ApplicationController on **Services** |
+| Deploy Workload apps | Git/intent → **Agent** on Workload (local apply; reports to Principal) |
 | Node capacity | **Karpenter** on Services plane: **5 Reserved** services + **5 Reserved** workload + **1.5× worker** waiting headroom; mgmt **3 Reserved** on management cluster |
 | Serverless / scale-to-zero | **Knative** on Workload plane |
 | Backup / restore | **Velero** on Workload + Services (snapshots / object storage, often **S3**) |
@@ -421,7 +428,7 @@ Add more rows here and on the SVG as the platform grows.
 1. Lock production substrate (3 AZ, bootstrap HA, CMK, endpoint, tags) — **in progress in YAML**  
 2. **Management plane** — pins + day-0 IaC in `management/` (**design done**); deploy VPC/DNS/TLS + bootstrap when ready  
 3. **Karpenter** production path — NodePools + Reserved 5/5 + 1.5× headroom (**manifests present**; controller IRSA + discovery tags next)  
-4. **Argo CD** Principal + Agent (Services) — unlocks the rest of the plane  
+4. **Argo CD** — Principal + ApplicationController (Services), Agent (Workload); design in `aws_eks/services/argocd/` (**done**); install when clusters ready  
 5. Peer services via Argo: secrets (OpenBao+ESO), IdP, Harbor, CNPG, Velero, OTel+LGTM  
 6. IRSA / Pod Identity **per service**; tighten CAPA IAM with conditions  
 7. CI gates (schema, policy, WAF guardrails); budgets; backup **restore drills**  

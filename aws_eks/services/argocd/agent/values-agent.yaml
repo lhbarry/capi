@@ -1,0 +1,37 @@
+# Workload cluster — argocd-agent configuration sketch
+# Align keys with argocd-agent install docs for the pinned version (VERSIONS.md).
+
+agent:
+  # Principal endpoint on Services cluster (internal DNS / NLB)
+  principal:
+    address: "argocd-agent-principal.argocd.svc.cluster.local"
+    # or external: principal.argocd.services.example.com:443
+    tls:
+      insecure: false
+      # caSecret / client certs per agent docs
+
+  # Independence: keep reconciling when hub is unreachable
+  mode: autonomous
+  # If upstream uses different flag names (e.g. managed vs autonomous),
+  # set the option that preserves local apply without Principal.
+
+  nodeSelector:
+    capacity.scke.io/plane: workload
+  tolerations:
+    - key: capacity.scke.io/plane
+      operator: Equal
+      value: workload
+      effect: NoSchedule
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+# Cluster identity as seen by Principal
+cluster:
+  name: workload
+  labels:
+    capacity.scke.io/plane: workload
