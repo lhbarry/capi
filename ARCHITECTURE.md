@@ -59,7 +59,7 @@ Score reflects **in-repo production design + evidence**, not fully deployed live
 |--------|------:|---------:|-----:|-------|
 | Operational Excellence | **3.2** | 0 | 2 | Three-cluster order, Argo/Turtles path; CI gates incomplete |
 | **Security** | **4.1** | 0 | 1 | Private API, detection, IRSA, PSS/NP — [wa-scorecard](docs/wa-scorecard.md) |
-| **Reliability** | **4.1** | 0 | 1 | 3-cluster HA, Velero schedules+drill, alarms, PDBs, RTO/RPO, mgmt etcd snapshots — [reliability.md](docs/reliability.md) |
+| **Reliability** | **4.1** | 0 | 1 | 3-cluster HA, Velero schedules+drill, **OTel→LGTM** alerts, PDBs, RTO/RPO, mgmt etcd — [reliability.md](docs/reliability.md) |
 | Performance Efficiency | **2.7** | 0 | 1 | Workload Karpenter; no metrics process |
 | Cost Optimization | **2.8** | 0 | 1 | Tags + budget template; undeployed |
 | Sustainability | **2.6** | 0 | 1 | Workload elasticity; Services static |
@@ -252,7 +252,7 @@ Industry names are primary; **team names** in parentheses for local vocabulary.
 | **Identity provider (IdP)** / SSO & federation | ID Federation | [Keycloak](https://www.keycloak.org/) | Users, realms, OIDC/SAML federation, client registration |
 | **Secrets management** (secrets store) | Secrets | [OpenBao](https://openbao.org/) | Central secrets engine (Vault-compatible lineage); dynamic secrets, policies |
 | **Secrets synchronization** (K8s secret injection) | Secrets | [External Secrets Operator](https://external-secrets.io/) | Syncs external backends (OpenBao, AWS SM, etc.) → Kubernetes `Secret`s |
-| **Telemetry collection** (instrumentation pipeline) | Obs. Infra | [OpenTelemetry](https://opentelemetry.io/) | SDKs + Collector: traces, metrics, logs → backends |
+| **Telemetry collection** (instrumentation pipeline) | Obs. Infra | [OpenTelemetry](https://opentelemetry.io/) | **Agents** (Workload) + **gateway** (Services): traces, metrics, logs → LGTM |
 | **Observability backend** (LGTM stack) | Observability | Grafana · Loki · Tempo · Mimir | Viz + logs + traces + metrics (long-term metrics via Mimir) |
 
 ### CI/CD — Argo CD Principal, ApplicationController, Agent
@@ -315,7 +315,7 @@ Industry language: **GitOps continuous delivery**. Team name: **CI/CD**.
 | Image supply chain | CI → Harbor; nodes pull from Harbor |
 | Stateful data | CloudNativePG-managed Postgres; **EBS CSI** (RWO block), **EFS CSI** (RWX), **S3** object |
 | Directory / identity federation | **AD / LDAP** (on-prem) → Keycloak (Services) where applicable |
-| Signals | **OpenTelemetry** Collector (only agent) → **Grafana LGTM** (Loki · Tempo · Mimir) — no Fluent Bit |
+| Signals | **OpenTelemetry** (only telemetry agent): Workload agents + Services gateway → **Grafana LGTM** (Loki · Tempo · Mimir) |
 
 ### Side surface catalogs (growing)
 
@@ -377,7 +377,7 @@ Add more rows here and on the SVG as the platform grows.
 | Services / app CD | Argo CD HA on Services plane | Design; manifests next |
 | VPC / AZ | **3 AZs**; VPC endpoints vs NAT as cost/security tradeoff | YAML → 3 AZ |
 | Bootstrap workers | ≥2 multi-AZ system nodes | YAML → 2 |
-| App/platform capacity | Karpenter **5 Reserved services + 5 Reserved workload + 1.5× headroom** | Manifests in `services/karpenter` |
+| App/platform capacity | Services: CAPA **5 Reserved** (no Karpenter). Workload: Karpenter **5 Reserved + 1.5× headroom** | CAPA MD + `services/karpenter` |
 | EKS API access | Private preferred; public only with tight CIDR until mgmt in-VPC | Explicit in YAML |
 | Control-plane logs | CAPA on; **OpenTelemetry → Loki**; SIEM optional from S3/Loki | Designed |
 | Secrets encryption | CMK (`aws_eks/kms`) | YAML + template |

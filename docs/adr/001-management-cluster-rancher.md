@@ -76,9 +76,10 @@ Management (3× EC2, RKE2 + Rancher)
   ├── CAPI + CAPA (cluster lifecycle → aws_eks/)
   └── (optional) GitOps agent for management desired state
 
-Downstream EKS (Services + Workload)
-  ├── Argo CD, Karpenter, platform services
-  └── Application workloads
+Downstream EKS (see ARCHITECTURE.md §7 / docs/clusters.md)
+  ├── Services: Argo Principal + ApplicationController, platform peers (no Karpenter)
+  ├── Workload: Argo Agent, Karpenter, Knative, apps
+  └── Telemetry: OpenTelemetry agents (Workload) + gateway → LGTM (Services)
 ```
 
 ## Alternatives considered

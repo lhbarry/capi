@@ -60,7 +60,7 @@ Common next AWS (or AWS-adjacent) capabilities. Default question: **pin AWS**, *
 | Public TLS certificates | ACM | cert-manager + public CA / Let’s Encrypt | `candidate` | |
 | Encryption keys / CMKs | KMS | OpenBao transit; limited substitute for AWS data-plane keys | `hybrid` | **2026-07-20:** KMS CMK for EKS secrets (`aws_eks/kms` + CAPA `encryptionConfig`); OpenBao remains app secrets SoR |
 | Managed secrets (cloud) | Secrets Manager / SSM Parameter Store | OpenBao + External Secrets | `candidate` | ESO can multi-store; prefer one SoR story |
-| Cloud metrics/logs (AWS native) | CloudWatch | **OpenTelemetry** → **LGTM** | `hybrid` | Diagram path is OTel+LGTM. EKS CP logs use AWS CP logging API then **OTel** into Loki. No Fluent Bit. No CW Alarms baseline. |
+| Cloud metrics/logs (AWS native) | CloudWatch (not on diagram rail) | **OpenTelemetry** agents + gateway → **LGTM** | `hybrid` | Catalog = OTel+LGTM only. EKS CP logs: AWS delivery constraint then **OTel→Loki**. No CW Alarms baseline. |
 | Container registry (AWS) | ECR | Harbor (committed OSS) pull-through to ECR | `candidate` | Likely **hybrid** if Harbor proxies ECR |
 | L4/L7 load balancing | NLB / ALB (+ AWS LB Controller) | MetalLB / ingress-nginx only (limited on EKS) | `candidate` | EKS almost always pins AWS LBs |
 | Private service access | VPC endpoints / PrivateLink | NAT only (cost/ops tradeoff) | `candidate` | |

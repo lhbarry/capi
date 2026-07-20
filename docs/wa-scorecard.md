@@ -40,7 +40,7 @@
 | **Change management** | Git desired state; provision order Management → Services → Workload | Designed |
 | **Backup** | Velero schedules Services + Workload; BSL to S3; volume snapshots weekly | Designed |
 | **Recovery** | RTO/RPO table; [restore-drill.md](../aws_eks/services/velero/restore-drill.md); Management etcd + Rancher backup notes | Designed |
-| **Monitoring / alarms** | **OpenTelemetry** + **Grafana LGTM** rules (`aws_eks/services/lgtm/`) — diagram services only | Designed |
+| **Monitoring / alarms** | **OpenTelemetry** agents (Workload) + gateway (Services) → **Grafana LGTM** rules (`aws_eks/services/lgtm/`) | Designed |
 | **HA workload placement** | Argo PDBs; topology guidance; multi-AZ CAPA | Designed |
 | **Quotas** | Service quota watchlist | Designed |
 
@@ -59,7 +59,9 @@ Calibration: **4.1 design** with backup, restore procedure, HA topology, alarms,
 
 ## Security ≥ 4.0 — evidence (summary)
 
-Private EKS API, CMK, encrypted volumes, CloudTrail/GuardDuty/Config, Karpenter IRSA, PSS, NetworkPolicies, IR stub — see prior SEC package / `aws_security/`.
+**Diagram-aligned:** private EKS API, CMK secrets, encrypted volumes, Karpenter IRSA, PSS, NetworkPolicies; observability via **OpenTelemetry → LGTM** (not CW ops).
+
+**Account controls (not AWS rail boxes):** CloudTrail→**S3**, GuardDuty, Config under `aws_security/` — use diagram **S3** for trail storage; not added to SVG AWS column. Owner may re-scope.
 
 ---
 

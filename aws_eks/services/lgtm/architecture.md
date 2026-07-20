@@ -1,9 +1,12 @@
 # LGTM architecture (diagram-aligned)
 
-**Telemetry agent (only):** [OpenTelemetry](https://opentelemetry.io/) — Collector · OTLP (diagram: Services plane DATA & OBSERVABILITY).  
+**Telemetry agents (only):** [OpenTelemetry](https://opentelemetry.io/) — diagram **DATA & OBSERVABILITY**.  
+- **Workload:** OTel Collector **agents** (DaemonSet / node) ship OTLP  
+- **Services:** OTel Collector **gateway** receives OTLP (+ optional CP-log receiver) → LGTM  
+
 **Backend (only):** Grafana LGTM — Loki · Tempo · Mimir (diagram).
 
-**Fluent Bit is not in the architecture** and must not be introduced.
+**Not in catalog:** Fluent Bit or any other shipper. Do not introduce them.
 
 ```text
 Workload cluster                         Services cluster
@@ -34,9 +37,11 @@ CAPA `logging:` enables EKS control-plane log delivery. **AWS only accepts Cloud
 
 **Architecture path:** OpenTelemetry Collector (with AWS CloudWatch Logs **receiver** in the collector config) reads those groups and exports to **Loki**. Day-2 operators use **Grafana**, not the CloudWatch console.
 
-No Fluent Bit. No Firehose/Lambda as architecture components unless you explicitly add them later.
+No extra shippers. No Firehose/Lambda as architecture components unless the owner adds them to the catalog **and** the SVG AWS rail (or Services plane) explicitly.
 
 ## Out of scope for this stack
 
 - CloudWatch Alarms / Container Insights as primary REL monitoring  
-- Extra log shippers not named in ARCHITECTURE.md §7  
+- Any log/metrics agent other than **OpenTelemetry**  
+- New AWS rail products beyond **EFS · EBS · S3**  
+

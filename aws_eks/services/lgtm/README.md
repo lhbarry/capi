@@ -9,8 +9,10 @@ Matches **ARCHITECTURE.md §7** and `docs/architecture.svg`:
 
 ## Not in architecture
 
-- **Fluent Bit** (never catalogued — do not use as baseline)  
+- Any telemetry agent other than **OpenTelemetry**  
 - CloudWatch as day-2 ops UI or primary alerting  
+- New AWS rail products beyond **EFS · EBS · S3**  
+
 
 ## Layout
 

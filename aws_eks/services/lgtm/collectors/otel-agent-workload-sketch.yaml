@@ -18,7 +18,7 @@ data:
             endpoint: 0.0.0.0:4317
           http:
             endpoint: 0.0.0.0:4318
-      # hostmetrics / k8scluster / filelog as needed — all OTel, no Fluent Bit
+      # hostmetrics / k8scluster / filelog as needed — OpenTelemetry only
       hostmetrics:
         scrapers:
           cpu: {}

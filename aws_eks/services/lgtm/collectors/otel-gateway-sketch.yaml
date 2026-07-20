@@ -19,7 +19,7 @@ data:
           http:
             endpoint: 0.0.0.0:4318
       # EKS control-plane logs: AWS delivers only to CloudWatch Logs.
-      # Use OTel contrib receiver (not Fluent Bit) to pull into the architecture pipeline.
+      # Use OTel contrib receiver to pull CP log groups into the architecture pipeline.
       awscloudwatchlogs:
         region: us-east-2
         log_group_name: /aws/eks/capi-eks-services/cluster

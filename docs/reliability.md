@@ -41,7 +41,7 @@
 |---------|------|
 | Velero install + schedules | [`aws_eks/services/velero/`](../aws_eks/services/velero/) |
 | Restore drill runbook | [`aws_eks/services/velero/restore-drill.md`](../aws_eks/services/velero/restore-drill.md) |
-| **LGTM alerts** (not CloudWatch) | [`aws_eks/services/lgtm/alerts/`](../aws_eks/services/lgtm/alerts/) |
+| **OpenTelemetry → LGTM alerts** | Agents + gateway + [`aws_eks/services/lgtm/alerts/`](../aws_eks/services/lgtm/alerts/) |
 | PDBs / topology | [`aws_eks/reliability/`](../aws_eks/reliability/) |
 | Management etcd snapshots | [`management/reliability.md`](../management/reliability.md) |
 | Service quotas | [`aws_reliability/quotas.md`](../aws_reliability/quotas.md) |
