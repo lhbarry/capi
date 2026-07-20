@@ -92,8 +92,8 @@ Same diagram as SVG: [docs/architecture.svg](docs/architecture.svg).
 2. CAPA on management (Rancher/RKE2) reconciles CAPA CRs → EKS + VPC + workers
 3. Operator (when IAM changes):
       aws cloudformation deploy --template-file aws_iam/*.yaml
-4. Services plane on downstream EKS (Argo CD Principal + Agent + peers) delivers
-   platform services and applications from git onto the cluster
+4. Services EKS: Argo CD Principal + ApplicationController (+ peers); Workload EKS: Agent
+   delivers platform and apps from git (Agent independent of Principal)
 ```
 
 | Layer | Commitment |

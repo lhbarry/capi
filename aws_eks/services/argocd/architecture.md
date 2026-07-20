@@ -2,14 +2,22 @@
 
 **Status:** production design  
 **Team name:** CI/CD  
-**Related:** [ADR-style decision in README](README.md) · [ARCHITECTURE.md §7](../../../ARCHITECTURE.md)
+**Related:** [README](README.md) · [ARCHITECTURE.md §7](../../../ARCHITECTURE.md)
 
-## Topology (locked by product decision)
+## Hard constraints
+
+| Constraint | Rule |
+|------------|------|
+| **No Principal + Agent co-location** | Argo CD does **not** support Principal and Agent on the **same** cluster (foreseeable future). Agent is **Workload only**. Never install Agent on Services/Principal. |
+| **Controller on Principal** | Principal runs **ApplicationController**, **not** ApplicationSetController. |
+| **ApplicationSetController** | **Disabled** on the Principal (Services) install. Services apps use **Application** CRs. |
+
+## Topology (locked)
 
 | Cluster | Components | Role |
 |---------|------------|------|
-| **Services cluster** | **Principal** + **ApplicationController** | Hub: UI/API, git, RBAC, Application CRs for services; ApplicationController reconciles **Services** apps |
-| **Workload cluster** | **Agent** | Spoke: local reconcile of **Workload** apps; **reports** to Principal; **operates independently** if Principal is unreachable |
+| **Services cluster** | **Principal** + **ApplicationController** | Hub: UI/API, git, RBAC; ApplicationController reconciles Services **Application** CRs |
+| **Workload cluster** | **Agent** only (no Principal) | Local reconcile of Workload apps; **reports** to Principal; **independent** if Principal is down |
 
 ```text
                     Git (desired state)
@@ -18,15 +26,16 @@
          ▼                               ▼
 ┌─────────────────────────┐   ┌──────────────────────────┐
 │  SERVICES CLUSTER       │   │  WORKLOAD CLUSTER        │
+│  (no Agent)             │   │  (no Principal)          │
 │                         │   │                          │
 │  Principal              │◄──│── Agent (reports status) │
-│   · API / UI / RBAC     │   │   · local Application    │
-│   · repo-server         │   │     controller path      │
-│   · redis / redis-ha    │   │   · applies manifests    │
-│                         │   │   · continues if hub down│
-│  ApplicationController  │   │                          │
-│   · reconciles Services │   │  Knative, apps, …        │
-│     plane Applications  │   │                          │
+│   · API / UI / RBAC     │   │   · local reconcile      │
+│   · repo-server         │   │   · applies manifests    │
+│   · redis               │   │   · continues if hub down│
+│                         │   │                          │
+│  ApplicationController  │   │  Knative, apps, …        │
+│   · Application CRs     │   │                          │
+│   · NOT ApplicationSet  │   │                          │
 │  Karpenter, peers …     │   │                          │
 └─────────────────────────┘   └──────────────────────────┘
 ```
@@ -35,51 +44,54 @@
 
 | Condition | Behavior |
 |-----------|----------|
-| Principal **up** | Agent reports health/sync status; accepts Application intent from hub protocol |
-| Principal **down** / network partition | Agent **keeps reconciling** Workload Applications already known locally (autonomous mode) |
+| Principal **up** | Agent reports health/sync; accepts intent from hub protocol |
+| Principal **down** / partition | Agent **keeps reconciling** known local Applications |
 | Principal recovers | Agent re-syncs status and intent with hub |
 
-This is **not** classic hub-only Argo CD (controller on hub pushes into spoke with long-lived credentials only). Workload reconciliation is **local** to the Workload cluster.
+Workload reconcile is **local** — not classic hub-only push with standing spoke credentials.
 
 ## Services ApplicationController vs Workload Agent
 
-| | Services ApplicationController | Workload Agent |
-|--|--------------------------------|----------------|
-| **Where** | Services cluster | Workload cluster |
-| **Reconciles** | Services-plane Applications (Argo, platform peers, etc.) | Workload-plane Applications (apps, Knative, …) |
-| **Depends on Principal** | Co-located with Principal (same cluster control plane) | Reports to Principal; **not** hard-dependent for ongoing apply |
-| **Network** | In-cluster to Services API | Agent **dials out** to Principal (pull model) |
+| | ApplicationController (Services) | Agent (Workload) |
+|--|----------------------------------|------------------|
+| **Cluster** | Services (with Principal) | Workload **only** |
+| **Type** | **ApplicationController** | Agent local path |
+| **Not** | ApplicationSetController | Principal |
+| **Reconciles** | Services **Application** CRs | Workload Applications |
+| **Co-location** | With Principal — required | **Forbidden** with Principal |
+| **Network** | In-cluster Services API | Agent dials **out** to Principal |
 
 ## Mapping to products
 
-| Our name | Implementation basis |
-|----------|----------------------|
-| **Principal** | Argo CD control plane (API server, UI, repo-server, redis, …) + **argocd-agent Principal** component on Services |
-| **ApplicationController** | Argo CD `application-controller` (and related) on Services for **local** Services Applications |
-| **Agent** | **argocd-agent** on Workload (local reconcile + hub reporting) |
+| Our name | Implementation |
+|----------|----------------|
+| **Principal** | Argo CD control plane + argocd-agent **hub** Principal on Services |
+| **ApplicationController** | Argo CD `application-controller` — **enabled** |
+| **ApplicationSetController** | `applicationset-controller` — **disabled** (`applicationSet.enabled: false`) |
+| **Agent** | argocd-agent on Workload only |
 
-See [argocd-agent docs](https://argocd-agent.readthedocs.io/) (pull-based multi-cluster; project maturing — pin versions and re-validate GA status at install).
+## Cluster layout (**two clusters required**)
 
-## Cluster physical layout
+Principal and Agent **cannot share a cluster**, so Services and Workload **must be separate Kubernetes clusters**.
 
-| Phase | Layout |
-|-------|--------|
-| **Near-term** | One CAPA EKS may host both planes as **namespace/node-pool isolation** (Services Reserved nodes vs Workload Reserved nodes). Install **Principal + ApplicationController** into Services namespaces/nodeSelectors; **Agent** into Workload namespaces/nodeSelectors targeting the same or separate API. |
-| **Target** | Distinct **Services EKS** and **Workload EKS** (or multi-cluster CAPA). Agent always on Workload; Principal + ApplicationController always on Services. |
+| Cluster | Argo components |
+|---------|-----------------|
+| **Services EKS** | Principal + ApplicationController |
+| **Workload EKS** | Agent only |
 
-Capacity labels (`capacity.scke.io/plane=services|workload`) and Karpenter Reserved pools align with this split.
+Node-pool-only split on a **single** EKS API is **not** valid for this Argo topology.
 
 ## Trust boundaries
 
 | Boundary | Control |
 |----------|---------|
 | Human → Principal UI | Keycloak OIDC + OAuth2 Proxy (Services) |
-| Agent → Principal | mTLS / agent credentials; agent initiates connection |
-| Git → Principal / Agent | Deploy keys or app credentials; least privilege per AppProject |
-| Principal → Workload API | **Not required** for agent mode (agent pulls); no standing admin kubeconfig from hub into workload for normal sync |
+| Agent → Principal | mTLS / agent credentials; agent initiates |
+| Git → Principal / Agent | Deploy keys; least privilege per AppProject |
+| Principal → Workload API | Not required for normal agent sync |
 
 ## Out of scope here
 
-- CI build system (feeds Harbor + git only)
-- AppProject catalog for every team (define when first apps land)
-- Full HA redis/SSO production values (sketched in values files)
+- CI build system  
+- AppProject catalog per team  
+- Full redis HA / SSO production values (sketched in values files)  
