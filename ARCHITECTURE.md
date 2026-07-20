@@ -58,15 +58,15 @@ Score reflects **in-repo production design + evidence**, not fully deployed live
 | Pillar | Score | Critical | High | Notes |
 |--------|------:|---------:|-----:|-------|
 | Operational Excellence | **3.2** | 0 | 2 | Three-cluster order, Argo/Turtles path; CI gates incomplete |
-| **Security** | **4.1** | 0 | 1 | Private API, detection, IRSA, PSS/NP — [wa-scorecard](docs/wa-scorecard.md) |
-| **Reliability** | **4.1** | 0 | 1 | 3-cluster HA, Velero schedules+drill, **OTel→LGTM** alerts, PDBs, RTO/RPO, mgmt etcd — [reliability.md](docs/reliability.md) |
+| **Security** | **4.2** | 0 | 1 | Private API, rail detection, OTel+CW-CP, OpenBao+ESO design — [wa-scorecard](docs/wa-scorecard.md) |
+| **Reliability** | **4.1** | 0 | 1 | 3-cluster HA, Velero design+drill, OTel→LGTM alerts, PDBs, RTO/RPO — [reliability.md](docs/reliability.md) |
 | Performance Efficiency | **2.7** | 0 | 1 | Workload Karpenter; no metrics process |
 | Cost Optimization | **2.8** | 0 | 1 | Tags + budget template; undeployed |
 | Sustainability | **2.6** | 0 | 1 | Workload elasticity; Services static |
 
-**Overall (design): ~3.4 / 5** · **SEC ≥ 4.0** · **REL ≥ 4.0** (design).  
+**Overall (design): ~3.5 / 5** · **SEC ≥ 4.0** · **REL ≥ 4.0** (design).  
 
-**Path to overall ≥ 3.8:** live install, CI gates, cost/sustainability process, ops metrics.
+**Path to overall ≥ 3.8:** live install, CI gates, OpenBao+ESO, Velero drill, cost/sustainability process.
 
 ---
 
