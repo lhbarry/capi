@@ -1,0 +1,29 @@
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: workload
+  labels:
+    capa.scke/path: aws-eks
+    capacity.scke.io/plane: workload
+spec:
+  role: nodes.cluster-api-provider-aws.sigs.k8s.io
+  amiSelectorTerms:
+    - alias: al2023@latest
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: capi-eks-workload
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: capi-eks-workload
+  tags:
+    Project: scke
+    Environment: production
+    Workload: capi-eks-workload
+    ManagedBy: karpenter
+    CostCenter: scke
+    capacity.scke.io/plane: workload
+  metadataOptions:
+    httpEndpoint: enabled
+    httpProtocolIPv6: disabled
+    httpPutResponseHopLimit: 2
+    httpTokens: required

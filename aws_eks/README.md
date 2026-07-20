@@ -23,10 +23,12 @@ Declarative CAPA manifests for **EKS managed control plane** (+ EC2 workers in c
 
 | Path | Purpose |
 |------|---------|
-| `clusters/` | CAPA EKS cluster manifests (Flux path; default empty) |
-| `clusters/capi-eks-1.yaml` | Lab EKS cluster + substrate hardens |
-| `kms/` | CMK for EKS secrets encryption (CLI CFN; not Flux) |
-| `services/` | Services plane on EKS (not Flux). Karpenter capacity first |
+| `clusters/services/` | **Cluster #2** CAPA EKS Services (`capi-eks-services`) |
+| `clusters/workload/` | **Cluster #3** CAPA EKS Workload (`capi-eks-workload`) |
+| `kms/` | CMK for EKS secrets (CLI CFN; not Flux) |
+| `services/` | Platform installs (Argo, Karpenter, …) — not Flux |
+
+Management cluster (#1): [`../management/`](../management/). Map: [`../docs/clusters.md`](../docs/clusters.md).
 
 ## Local validation (no AWS, no Flux apply)
 

@@ -1,0 +1,142 @@
+# CAPA EKS — Workload cluster (applications)
+# Argo CD Agent (reports to Services Principal; independent), Knative, tenant apps.
+# Managed by CAPA on the Management cluster. No Argo Principal on this cluster.
+#
+# Prerequisites: aws_iam stacks, aws_eks/kms CMK. Keep parent kustomization resources empty until promote.
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: capi-eks-workload
+  namespace: default
+  labels:
+    capa.scke/path: aws-eks
+    capa.scke/cluster-role: workload
+    capa.scke/cost-center: scke
+    capa.scke/phase: production-design
+    capacity.scke.io/plane: workload
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks:
+      - 10.97.0.0/16
+  controlPlaneRef:
+    apiVersion: controlplane.cluster.x-k8s.io/v1beta2
+    kind: AWSManagedControlPlane
+    name: capi-eks-workload-control-plane
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+    kind: AWSManagedCluster
+    name: capi-eks-workload
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSManagedCluster
+metadata:
+  name: capi-eks-workload
+  namespace: default
+spec: {}
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1beta2
+kind: AWSManagedControlPlane
+metadata:
+  name: capi-eks-workload-control-plane
+  namespace: default
+spec:
+  region: PLACEHOLDER_AWS_REGION
+  version: v1.34.1
+  eksClusterName: capi-eks-workload
+  sshKeyName: ""
+  bastion:
+    enabled: false
+  associateOIDCProvider: true
+  endpointAccess:
+    private: true
+    public: true
+    publicCIDRs:
+    - PLACEHOLDER_PUBLIC_API_CIDR
+  logging:
+    apiServer: true
+    audit: true
+    authenticator: true
+    controllerManager: true
+    scheduler: true
+  encryptionConfig:
+    provider: alias/cluster-api-provider-aws-eks-secrets
+    resources:
+    - secrets
+  additionalTags:
+    Project: scke
+    Environment: production
+    Workload: capi-eks-workload
+    ManagedBy: capa
+    CostCenter: scke
+    Phase: production-design
+    capacity.scke.io/plane: workload
+    karpenter.sh/discovery: capi-eks-workload
+  network:
+    vpc:
+      availabilityZoneUsageLimit: 3
+      availabilityZoneSelection: Ordered
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachineDeployment
+metadata:
+  name: capi-eks-workload-md-0
+  namespace: default
+  labels:
+    capacity.scke.io/role: bootstrap-system
+    capacity.scke.io/plane: workload
+spec:
+  clusterName: capi-eks-workload
+  replicas: 2
+  selector:
+    matchLabels: null
+  template:
+    spec:
+      version: v1.34.1
+      bootstrap:
+        configRef:
+          apiVersion: bootstrap.cluster.x-k8s.io/v1beta2
+          kind: NodeadmConfigTemplate
+          name: capi-eks-workload-md-0
+      clusterName: capi-eks-workload
+      infrastructureRef:
+        apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+        kind: AWSMachineTemplate
+        name: capi-eks-workload-md-0-al2023
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSMachineTemplate
+metadata:
+  name: capi-eks-workload-md-0-al2023
+  namespace: default
+spec:
+  template:
+    spec:
+      ami:
+        eksLookupType: AmazonLinux2023
+      iamInstanceProfile: nodes.cluster-api-provider-aws.sigs.k8s.io
+      instanceType: t3.large
+      sshKeyName: ""
+      publicIP: false
+      cloudInit:
+        insecureSkipSecretsManager: true
+      additionalTags:
+        Project: scke
+        Environment: production
+        Workload: capi-eks-workload
+        ManagedBy: capa
+        CostCenter: scke
+        Role: bootstrap-system
+        Phase: production-design
+        capacity.scke.io/plane: workload
+        karpenter.sh/discovery: capi-eks-workload
+---
+apiVersion: bootstrap.cluster.x-k8s.io/v1beta2
+kind: NodeadmConfigTemplate
+metadata:
+  name: capi-eks-workload-md-0
+  namespace: default
+spec:
+  template:
+    spec: {}

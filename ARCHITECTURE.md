@@ -56,32 +56,28 @@ Design and implement **production-grade create/manage of EKS on AWS** with:
 ## 2. High-level topology
 
 ```text
-  ┌ On Prem ────┐                                          ┌ AWS Services ─┐
-  │ AD/LDAP     │   Git · aws_eks/ · aws_iam/ · docs       │ EFS CSI (RWX) │
-  │ SMTP        │                                          │ EBS CSI (HP)  │
-  │ MS Teams    │   Rancher/RKE2×3    Identity CFN         │ S3            │
-  │             │         │                    │           │               │
-  │             │         ▼                    ▼           │               │
-  │             │   Services plane (on EKS) …              │               │
-  │             │   Workload plane (EKS) …   ← bottom      │               │
-  └─────────────┘                                          └───────────────┘
+  ┌ On Prem ────┐     Git · management/ · aws_eks/ · aws_iam/     ┌ AWS Services ─┐
+  │ AD/LDAP     │                                                   │ EFS · EBS · S3 │
+  │ SMTP        │     Management (Rancher/RKE2 × 3)  Identity CFN  │               │
+  │ MS Teams    │              │                                   └───────────────┘
+  └─────────────┘              ├──► Services EKS (capi-eks-services)
+                               └──► Workload EKS (capi-eks-workload)
 ```
 
-Same diagram as SVG: [docs/architecture.svg](docs/architecture.svg).
+**Three clusters:** [docs/clusters.md](docs/clusters.md). Visual: [docs/architecture.svg](docs/architecture.svg) (update when diagram is redrawn).
 
-### Planes and side surfaces
+### Clusters, planes, side surfaces
 
 | Layer | Kind | Where | What lives there |
 |-------|------|-------|------------------|
-| **Source of truth** | Plane | Git Repo | EKS CAPA YAML, IAM templates, docs; services manifests (target) |
-| **Management** | Plane | **SUSE Rancher / RKE2** (3 EC2, multi-AZ) | Rancher Manager + CAPI/CAPA; provisions downstream EKS |
-| **Identity bootstrap** | Plane | AWS IAM via CloudFormation | CAPA controllers + EKS CP role + node instance profile |
-| **Services** | Plane / cluster | Services EKS | Platform: **Argo CD Principal + ApplicationController**, **Karpenter**, **Velero**, secrets, data, registry, identity, observability — see §7 |
-| **Workload** | Plane | AWS EKS (bottom of diagram) | Network, managed CP, CAPA workers, **Argo CD Agent**, **Knative**, **Velero** |
-| **On Prem Services** | Side surface (not a plane) | Left margin | **AD / LDAP**, **SMTP**, **MS Teams** — more TBD |
-| **AWS Services** | Side surface (not a plane) | Right margin | **EFS CSI (RWX)**, **EBS CSI (HP block)**, **S3** — more TBD |
+| **Source of truth** | Plane | Git | CAPA YAML, IAM, management, services manifests |
+| **Management** | **Cluster #1** | RKE2 + Rancher (`management/`) | Rancher, CAPI/CAPA → provisions Services + Workload EKS |
+| **Identity bootstrap** | Plane | AWS IAM CFN | CAPA controllers + EKS roles + node profiles |
+| **Services** | **Cluster #2** | EKS `capi-eks-services` | Argo **Principal + ApplicationController**, Karpenter, platform peers |
+| **Workload** | **Cluster #3** | EKS `capi-eks-workload` | Argo **Agent**, Knative, apps; no Principal |
+| **On Prem / AWS Services** | Side surfaces | Margins | AD/LDAP, SMTP, Teams · EFS/EBS/S3 |
 
-**Critical rule:** CAPA (on the **Rancher/RKE2 management cluster**) provisions **AWS** (EKS, EC2, VPC, …). **Services plane** (including Argo CD Principal) and **Workload plane** (including Argo CD Agent) both sit on **downstream EKS**. Side rails are integration surfaces, not planes.
+**Critical rule:** CAPA on **Management** creates **two** EKS clusters (Services + Workload). Argo Principal never co-locates with Agent.
 
 ---
 
@@ -111,8 +107,10 @@ IAM is deployed with the AWS CLI from templates in git (YAML-first, not console-
 
 | Path | Owns | Applied by |
 |------|------|------------|
-| [`management/`](management/) | Production management plane (Rancher / RKE2 design) | Day-0 + Rancher ops (grows) |
-| [`aws_eks/`](aws_eks/) | Downstream EKS CAPA + Services | CAPA on management → AWS |
+| [`management/`](management/) | **Cluster #1** Management (Rancher / RKE2) | Day-0 CFN + bootstrap |
+| [`aws_eks/clusters/services/`](aws_eks/clusters/services/) | **Cluster #2** Services EKS CAPA | CAPA on management → AWS |
+| [`aws_eks/clusters/workload/`](aws_eks/clusters/workload/) | **Cluster #3** Workload EKS CAPA | CAPA on management → AWS |
+| [`aws_eks/services/`](aws_eks/services/) | Platform installs (Argo, Karpenter, …) | Onto Services and/or Workload |
 | [`aws_iam/`](aws_iam/) | CAPA IAM CloudFormation | `aws cloudformation deploy` |
 | [`aws_ec2/`](aws_ec2/) | Secondary / future mirror of this design | Not the architecture focus |
 | [`clusters/capi-mgmt/`](clusters/capi-mgmt/) | **Historical** Kind + Flux lab | **Not** production management |
@@ -146,35 +144,30 @@ Services plane will need **additional** identities (IRSA / Pod Identity, Harbor 
 
 **Intent:** CAPA **`AWSManagedControlPlane`** (EKS) + CAPA **`MachineDeployment`** workers on EC2. This is the substrate for the **Services plane**.
 
-Canonical cluster: [`aws_eks/clusters/capi-eks-1.yaml`](aws_eks/clusters/capi-eks-1.yaml)  
-(Origin: `clusterctl generate` eks flavor; evolved through lab; **now production design baseline**.)
+**CAPA EKS definitions (two clusters):**
 
-### Object graph
+| Cluster | Manifest |
+|---------|----------|
+| Services | [`aws_eks/clusters/services/cluster.yaml`](aws_eks/clusters/services/cluster.yaml) → `capi-eks-services` |
+| Workload | [`aws_eks/clusters/workload/cluster.yaml`](aws_eks/clusters/workload/cluster.yaml) → `capi-eks-workload` |
+
+Map: [docs/clusters.md](docs/clusters.md).
+
+### Object graph (each CAPA EKS)
 
 ```text
-Cluster (capi-eks-1)
-  ├── controlPlaneRef → AWSManagedControlPlane   (EKS)
+Cluster (capi-eks-services | capi-eks-workload)
+  ├── controlPlaneRef → AWSManagedControlPlane
   └── infrastructureRef → AWSManagedCluster
 
-MachineDeployment (capi-eks-1-md-0)          # bootstrap / system (Karpenter, CoreDNS, …)
-  ├── bootstrap → NodeadmConfigTemplate
-  └── infrastructureRef → AWSMachineTemplate
-        ami.eksLookupType: AmazonLinux2023
-        iamInstanceProfile: nodes.cluster-api-provider-aws.sigs.k8s.io
+MachineDeployment (*-md-0)     # bootstrap × 2 (system)
+  └── AWSMachineTemplate AL2023 + NodeadmConfigTemplate
 
-Karpenter (Services plane)                  # Reserved 5 services + 5 workload + 1.5× headroom
-  ├── EC2NodeClass default
-  ├── NodePool reserved-services | reserved-workload | elastic
-  └── overprovisioning pause pods
+Karpenter (per cluster)
+  ├── EC2NodeClass services | workload
+  ├── NodePool reserved-* + elastic
+  └── overprovisioning
 ```
-
-| Resource | Manifest |
-|----------|----------|
-| `Cluster` + `AWSManagedCluster` | `aws_eks/clusters/capi-eks-1.yaml` |
-| `AWSManagedControlPlane` | same — region, version, VPC AZ limits, hardens |
-| Bootstrap MD + `AWSMachineTemplate` + `NodeadmConfigTemplate` | same |
-| Karpenter capacity | `aws_eks/services/karpenter/` |
-| Worker AMI | `eksLookupType: AmazonLinux2023` (EKS 1.34+) |
 
 ### Production topology knobs (design baseline)
 
@@ -334,8 +327,8 @@ Add more rows here and on the SVG as the platform grows.
 | Apply path for apps / peer services | **Argo CD** |
 | On Prem / AWS Services | Vertical side surfaces — not planes; inventory grows over time |
 | Isolation | Dedicated namespaces per capability (and later network policies) |
-| Topology | Single EKS hosts Services + Workload planes initially; multi-cluster later if blast-radius requires it |
-| Capacity | **3** mgmt Reserved + **5** services Reserved + **5** workload Reserved + **1.5×** worker headroom — production floor |
+| Topology | **Three clusters:** Management + Services EKS + Workload EKS ([docs/clusters.md](docs/clusters.md)) |
+| Capacity | Mgmt **3× m7i.xlarge**; each EKS bootstrap **2** + Karpenter **5 Reserved** + **1.5×** headroom per EKS |
 
 ### Services plane production bar
 

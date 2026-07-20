@@ -1,9 +1,11 @@
-# Services-plane Karpenter config for the EKS Services Cluster.
-# NOT under Flux path aws_eks/clusters — apply only when intentional.
+# Karpenter CRs — apply per target cluster (not a single monocluster).
+# Services cluster: nodeclass-services + reserved-services + elastic + headroom (+ services overprovision)
+# Workload cluster: nodeclass-workload + reserved-workload + elastic (copy with nodeClassRef workload) + workload overprovision
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - nodeclass-default.yaml
+  - nodeclass-services.yaml
+  - nodeclass-workload.yaml
   - nodepool-reserved-services.yaml
   - nodepool-reserved-workload.yaml
   - nodepool-elastic.yaml

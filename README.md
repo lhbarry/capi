@@ -14,13 +14,15 @@ Arch. adaptation from On-Prem to AWS Cloud Services Hosting — **Cluster API + 
 
 **Management:** **SUSE Rancher** on **RKE2** / **Ubuntu latest stable LTS**, **3 × (4 vCPU / 16 GiB / 100 GiB gp3)** ([ADR-001](docs/adr/001-management-cluster-rancher.md) · [`management/`](management/)). Experimental `clusters/capi-mgmt` (Kind) is not production.
 
-## Primary path: EKS + Services plane (production)
+## Three clusters (production)
 
-| Path | Owns | Apply how |
-|------|------|-----------|
-| **`aws_eks/`** | CAPA EKS substrate + KMS; **Services** under `aws_eks/services/` | CAPA → AWS; Services via Argo (target) or explicit apply |
-| **`aws_iam/`** | CAPA IAM CloudFormation | `aws cloudformation deploy --template-file …` |
-| **`aws_cost/`** | Production budget guardrails | CLI deploy — not Flux |
+| Cluster | Path | Apply how |
+|---------|------|-----------|
+| **1. Management** | [`management/`](management/) | Day-0 CFN + RKE2 + Rancher ([docs/clusters.md](docs/clusters.md)) |
+| **2. Services EKS** | [`aws_eks/clusters/services/`](aws_eks/clusters/services/) | CAPA on Management |
+| **3. Workload EKS** | [`aws_eks/clusters/workload/`](aws_eks/clusters/workload/) | CAPA on Management |
+| Platform installs | [`aws_eks/services/`](aws_eks/services/) (Argo, Karpenter, …) | Onto Services and/or Workload |
+| IAM / cost / KMS | `aws_iam/`, `aws_cost/`, `aws_eks/kms/` | CLI CFN when promoting |
 
 ### Services plane
 

@@ -1,71 +1,65 @@
-# CAPA EKS — production design baseline (Services + Workload substrate).
-# Origin: clusterctl generate --flavor eks; evolved from completed lab phase.
+# CAPA EKS — Services cluster (platform)
+# Argo CD Principal + ApplicationController, Karpenter (services), platform peers.
+# Managed by CAPA on the Management cluster. Not co-located with Workload Agent.
 #
-# Production WAF substrate:
-#   3 AZ, bootstrap HA, logging, endpoint allowlist, CMK encryption, OIDC, SSM-only, tags.
-# Capacity: CAPA bootstrap for system; Karpenter owns 5 Reserved services + 5 Reserved workload
-#   + 1.5× worker headroom (aws_eks/services/karpenter/).
-#
-# Apply path: enable Flux resources only when intentionally creating AWS; deploy aws_eks/kms first.
+# Prerequisites: aws_iam stacks, aws_eks/kms CMK. Keep parent kustomization resources empty until promote.
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: Cluster
 metadata:
-  name: capi-eks-1
+  name: capi-eks-services
   namespace: default
   labels:
     capa.scke/path: aws-eks
+    capa.scke/cluster-role: services
     capa.scke/cost-center: scke
     capa.scke/phase: production-design
+    capacity.scke.io/plane: services
 spec:
   clusterNetwork:
     pods:
       cidrBlocks:
-      - 192.168.0.0/16
+      - 10.96.0.0/16
   controlPlaneRef:
     apiVersion: controlplane.cluster.x-k8s.io/v1beta2
     kind: AWSManagedControlPlane
-    name: capi-eks-1-control-plane
+    name: capi-eks-services-control-plane
   infrastructureRef:
     apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
     kind: AWSManagedCluster
-    name: capi-eks-1
+    name: capi-eks-services
 ---
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: AWSManagedCluster
 metadata:
-  name: capi-eks-1
+  name: capi-eks-services
   namespace: default
 spec: {}
 ---
 apiVersion: controlplane.cluster.x-k8s.io/v1beta2
 kind: AWSManagedControlPlane
 metadata:
-  name: capi-eks-1-control-plane
+  name: capi-eks-services-control-plane
   namespace: default
 spec:
   region: PLACEHOLDER_AWS_REGION
   version: v1.34.1
-  # No standing SSH / bastion — SSM on nodes (WAF SEC).
+  eksClusterName: capi-eks-services
   sshKeyName: ""
   bastion:
     enabled: false
-  # OIDC for IRSA / Pod Identity (required for production Services).
   associateOIDCProvider: true
-  # Private always; public only with tight CIDR until management is in-VPC (then private-only).
   endpointAccess:
     private: true
     public: true
     publicCIDRs:
     - PLACEHOLDER_PUBLIC_API_CIDR
-  # Control-plane logs → CloudWatch (WAF SEC / OPS).
   logging:
     apiServer: true
     audit: true
     authenticator: true
     controllerManager: true
     scheduler: true
-  # Secrets encryption at rest — deploy aws_eks/kms before cluster create.
   encryptionConfig:
     provider: alias/cluster-api-provider-aws-eks-secrets
     resources:
@@ -73,26 +67,27 @@ spec:
   additionalTags:
     Project: scke
     Environment: production
-    Workload: capi-eks-1
+    Workload: capi-eks-services
     ManagedBy: capa
     CostCenter: scke
     Phase: production-design
+    capacity.scke.io/plane: services
+    karpenter.sh/discovery: capi-eks-services
   network:
     vpc:
-      # Production HA: 3 AZs (WAF REL). NAT cost is accepted for the design floor.
       availabilityZoneUsageLimit: 3
       availabilityZoneSelection: Ordered
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: MachineDeployment
 metadata:
-  name: capi-eks-1-md-0
+  name: capi-eks-services-md-0
   namespace: default
   labels:
     capacity.scke.io/role: bootstrap-system
+    capacity.scke.io/plane: services
 spec:
-  clusterName: capi-eks-1
-  # Bootstrap / system HA (Karpenter, CoreDNS, CNI). App capacity is Karpenter Reserved pools.
+  clusterName: capi-eks-services
   replicas: 2
   selector:
     matchLabels: null
@@ -103,24 +98,22 @@ spec:
         configRef:
           apiVersion: bootstrap.cluster.x-k8s.io/v1beta2
           kind: NodeadmConfigTemplate
-          name: capi-eks-1-md-0
-      clusterName: capi-eks-1
+          name: capi-eks-services-md-0
+      clusterName: capi-eks-services
       infrastructureRef:
         apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
         kind: AWSMachineTemplate
-        # New name required: AWSMachineTemplate.spec is immutable
-        name: capi-eks-1-md-0-al2023
+        name: capi-eks-services-md-0-al2023
 ---
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: AWSMachineTemplate
 metadata:
-  name: capi-eks-1-md-0-al2023
+  name: capi-eks-services-md-0-al2023
   namespace: default
 spec:
   template:
     spec:
       ami:
-        # EKS 1.34 has no AL2 optimized AMI; use AL2023 SSM lookup
         eksLookupType: AmazonLinux2023
       iamInstanceProfile: nodes.cluster-api-provider-aws.sigs.k8s.io
       instanceType: t3.large
@@ -131,16 +124,18 @@ spec:
       additionalTags:
         Project: scke
         Environment: production
-        Workload: capi-eks-1
+        Workload: capi-eks-services
         ManagedBy: capa
         CostCenter: scke
         Role: bootstrap-system
         Phase: production-design
+        capacity.scke.io/plane: services
+        karpenter.sh/discovery: capi-eks-services
 ---
 apiVersion: bootstrap.cluster.x-k8s.io/v1beta2
 kind: NodeadmConfigTemplate
 metadata:
-  name: capi-eks-1-md-0
+  name: capi-eks-services-md-0
   namespace: default
 spec:
   template:

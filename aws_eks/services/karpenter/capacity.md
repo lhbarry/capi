@@ -35,29 +35,25 @@ capacity.scke.io/reservation=reserved
 - Target: **3** multi-AZ nodes for CAPI/CAPA/GitOps control plane.  
 - See `management-reserved.md`. **Not** scaled by Services-plane Karpenter.
 
-### Services & Workload (5 + 5 Reserved)
+### Services & Workload (5 + 5 Reserved) — separate EKS clusters
 
-On the EKS cluster that hosts Services + Workload:
+| Cluster | CAPA name | Karpenter floor |
+|---------|-----------|-----------------|
+| **Services** | `capi-eks-services` | NodePool `reserved-services` + 5× pause overprovision + elastic headroom |
+| **Workload** | `capi-eks-workload` | NodePool `reserved-workload` + 5× pause overprovision + elastic headroom |
 
-1. Karpenter **NodePools** with labels/taints per plane.  
-2. **Overprovisioning** Deployments: low priority, ~one worker resources each, hostname anti-affinity, `replicas: 5` → holds **5 nodes** per plane.  
-3. Real pods use higher priority + plane tolerations; they preempt pause pods; Karpenter + headroom absorb the shock.
-
-NodePool `limits` cap each reserved pool (~5 × t3.large).
+Each cluster runs **its own** Karpenter controller and discovery tag (`karpenter.sh/discovery: <cluster-name>`).
 
 ### Headroom (1.5 × worker, waiting)
 
-`headroom-overprovision` requests **3 CPU + 12 GiB** on the **elastic** pool (lowest priority).
-
-- Idle: capacity is **available and waiting**.  
-- Burst: preempt → schedule real work → Karpenter scales → headroom refills.
+`headroom-overprovision` (**3 CPU + 12 GiB**) on each cluster’s **elastic** pool (preemptible).
 
 ## Bootstrap vs Karpenter
 
 | Layer | Role | Production |
 |-------|------|------------|
-| CAPA `MachineDeployment` | Bootstrap / system | **2** replicas multi-AZ (HA for Karpenter, CoreDNS, CNI) |
-| Karpenter | Reserved + elastic | **5 + 5 Reserved** + **1.5×** headroom + burst |
+| CAPA MD (each EKS) | Bootstrap / system | **2** replicas multi-AZ |
+| Karpenter (each EKS) | Reserved + elastic | Services: **5 Reserved**; Workload: **5 Reserved**; each + **1.5×** headroom |
 
 Do not treat Reserved pause capacity as “waste” to consolidate away; reserved pools use conservative disruption.
 

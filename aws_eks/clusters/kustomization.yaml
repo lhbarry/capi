@@ -1,28 +1,31 @@
-# Flux path ./aws_eks/clusters
-# Parameterize via configMapGenerator + replacements (edit literals before enabling resources).
+# CAPA EKS cluster definitions (Services + Workload).
+# Management cluster is NOT here — see management/ (Rancher/RKE2).
 #
-# SAFETY: keep resources: [] until intentional environment promotion.
-# Enabling + push to a Flux-tracked branch creates real EKS (3 AZ production floor).
+# SAFETY: keep nested and parent resources empty until intentional promotion.
+# Enabling + apply via CAPA creates real EKS (3 AZ production floor each).
+#
+# Three-cluster map: docs/clusters.md
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Re-add the cluster file when provisioning, e.g.:
-#   resources: [capi-eks-1.yaml]
+# Parent does not nest-enable children by default. Enable per-cluster kustomizations
+# or list cluster.yaml files here when promoting, e.g.:
+#   resources:
+#     - services/cluster.yaml
+#     - workload/cluster.yaml
 resources: []
 
 configMapGenerator:
   - name: capa-eks-cluster-params
     namespace: default
     literals:
-      # Set these for your environment before enabling resources and pushing.
       - AWS_REGION=us-east-2
-      # Your public IP/32 (or office egress) for EKS public API allowlist.
-      # Never leave as 0.0.0.0/0 in shared accounts.
+      # Shared allowlist for public EKS API until private-only; never 0.0.0.0/0 in shared accounts.
       - PUBLIC_API_CIDR=YOUR_PUBLIC_IP/32
     options:
       disableNameSuffixHash: true
       labels:
-        capa.lab/params: eks
+        capa.scke/params: eks
 
 replacements:
   - source:

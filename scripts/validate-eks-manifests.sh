@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
-# Local-only CAPA EKS manifest check. Does not apply to cluster or AWS.
+# Local-only CAPA EKS manifest check (Services + Workload). Does not apply to cluster or AWS.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD="$(mktemp -d)"
 trap 'rm -rf "$BUILD"' EXIT
 
-# Build with resources enabled in a temp dir (does not touch git tree)
-cp "$ROOT/aws_eks/clusters/capi-eks-1.yaml" "$BUILD/"
-cat > "$BUILD/kustomization.yaml" <<'KUST'
+build_one() {
+  local name="$1"
+  local src="$2"
+  local dir="$BUILD/$name"
+  mkdir -p "$dir"
+  cp "$src" "$dir/cluster.yaml"
+  cat > "$dir/kustomization.yaml" <<'KUST'
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - capi-eks-1.yaml
+  - cluster.yaml
 configMapGenerator:
   - name: capa-eks-cluster-params
     namespace: default
@@ -40,37 +44,52 @@ replacements:
         fieldPaths:
           - spec.endpointAccess.publicCIDRs.0
 KUST
+  local out="$dir/out.yaml"
+  kubectl kustomize "$dir" > "$out"
+  echo "kustomize OK $name ($(wc -l < "$out") lines)"
 
-OUT="$BUILD/out.yaml"
-kubectl kustomize "$BUILD" > "$OUT"
-echo "kustomize OK ($(wc -l < "$OUT") lines)"
+  for needle in \
+    "apiServer: true" \
+    "encryptionConfig:" \
+    "associateOIDCProvider: true" \
+    "sshKeyName: \"\"" \
+    "alias/cluster-api-provider-aws-eks-secrets" \
+    "availabilityZoneUsageLimit: 3"
+  do
+    if ! grep -q "$needle" "$out"; then
+      echo "FAIL $name: missing harden marker: $needle" >&2
+      exit 1
+    fi
+  done
+  echo "harden markers OK $name"
 
-# Required harden markers
-for needle in \
-  "apiServer: true" \
-  "encryptionConfig:" \
-  "associateOIDCProvider: true" \
-  "sshKeyName: \"\"" \
-  "alias/cluster-api-provider-aws-eks-secrets"
+  if kubectl get crd awsmanagedcontrolplanes.controlplane.cluster.x-k8s.io >/dev/null 2>&1; then
+    kubectl apply --dry-run=server -f "$out" >/dev/null
+    echo "server dry-run OK $name"
+  else
+    echo "skip server dry-run $name (CAPA CRDs not available)"
+  fi
+}
+
+build_one services "$ROOT/aws_eks/clusters/services/cluster.yaml"
+build_one workload "$ROOT/aws_eks/clusters/workload/cluster.yaml"
+
+# Parent and children must stay empty in pure-dev
+for f in \
+  "$ROOT/aws_eks/clusters/kustomization.yaml" \
+  "$ROOT/aws_eks/clusters/services/kustomization.yaml" \
+  "$ROOT/aws_eks/clusters/workload/kustomization.yaml"
 do
-  if ! grep -q "$needle" "$OUT"; then
-    echo "FAIL: missing harden marker: $needle" >&2
-    exit 1
+  if ! grep -qE '^resources: \[\]$' "$f"; then
+    echo "WARN: $f resources is not []" >&2
+    exit 2
   fi
 done
-echo "harden markers OK"
+echo "repo resources: [] OK (parent + services + workload)"
 
-if kubectl get crd awsmanagedcontrolplanes.controlplane.cluster.x-k8s.io >/dev/null 2>&1; then
-  kubectl apply --dry-run=server -f "$OUT" >/dev/null
-  echo "server dry-run OK"
-else
-  echo "skip server dry-run (CAPA CRDs not available)"
-fi
+# Management is third cluster (not CAPA YAML here)
+test -f "$ROOT/management/README.md"
+test -f "$ROOT/docs/clusters.md"
+echo "three-cluster map present"
 
-# Safety: repo kustomization must stay empty in pure-dev
-if ! grep -qE '^resources: \[\]$' "$ROOT/aws_eks/clusters/kustomization.yaml"; then
-  echo "WARN: aws_eks/clusters/kustomization.yaml resources is not []" >&2
-  exit 2
-fi
-echo "repo resources: [] OK"
 echo "ALL CHECKS PASSED (local only)"

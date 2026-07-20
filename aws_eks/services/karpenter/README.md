@@ -1,7 +1,7 @@
 # Karpenter — Services plane (Compute)
 
-**Placement:** Services plane on production EKS (CAPA `capi-eks-1` substrate).  
-**Status:** Production capacity design in-repo. Apply with controller install when promoting; not auto-wired through experimental Flux `aws_eks/clusters` path.
+**Placement:** Install Karpenter **per EKS cluster** (`capi-eks-services` and `capi-eks-workload`).  
+**Status:** Production capacity design in-repo. Not Flux-wired.
 
 ## What this provides
 
@@ -17,11 +17,11 @@
 
 ## Prerequisites (production apply)
 
-1. EKS up (CAPA) with OIDC, CMK encryption, CP logging.  
-2. Karpenter controller (Helm) + **IRSA/Pod Identity** — see `install.md`.  
+1. Target EKS up (Services and/or Workload) with OIDC, CMK, CP logging.  
+2. Karpenter controller (Helm) + **IRSA/Pod Identity** on **that** cluster — see `install.md`.  
 3. CAPA bootstrap **≥2** system nodes.  
-4. Tag subnets/SGs `karpenter.sh/discovery: capi-eks-1` (or edit selectors).  
-5. Dedicated Karpenter node role preferred over long-term reuse of CAPA node role.
+4. Tag subnets/SGs `karpenter.sh/discovery: capi-eks-services` or `capi-eks-workload`.  
+5. Apply only the NodeClass/NodePools for that cluster (do not apply workload pools on services API and vice versa).
 
 ## Apply (intentional only — not Flux)
 

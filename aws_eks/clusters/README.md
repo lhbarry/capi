@@ -1,40 +1,43 @@
-# EKS clusters (CAPA) — production design
+# CAPA EKS clusters — Services + Workload
 
-## Apply path
+**Three-cluster map:** [docs/clusters.md](../../docs/clusters.md)
 
-Flux Kustomization **`flux-system/aws-eks-clusters`** may track this directory on experimental Kind. **Production CD** is Argo CD on the Services plane (design). Keep `resources: []` until an intentional promotion creates AWS.
+| Cluster | Path | CAPA name | Role |
+|---------|------|-----------|------|
+| **Management** | [`management/`](../../management/) | N/A (RKE2) | Rancher, CAPI/CAPA |
+| **Services** | [`services/cluster.yaml`](services/cluster.yaml) | `capi-eks-services` | Argo Principal + ApplicationController, platform |
+| **Workload** | [`workload/cluster.yaml`](workload/cluster.yaml) | `capi-eks-workload` | Argo Agent, apps |
 
-```bash
-# Intentional provision only:
-# 1) Deploy IAM + aws_eks/kms CMK
-# 2) Set AWS_REGION + PUBLIC_API_CIDR in kustomization.yaml
-# 3) resources: [capi-eks-1.yaml]
-# 4) Apply via chosen control path (not casual push to experimental Flux)
-```
+Legacy monocluster `capi-eks-1` is **removed** (split into the two CAPA definitions above).
 
-## Parameters
+## Safety
+
+Keep `resources: []` in this kustomization and in `services/` / `workload/` until intentional CAPA apply. Experimental Flux still tracks `./aws_eks/clusters`.
+
+## Parameters (parent `kustomization.yaml`)
 
 | Literal | Purpose |
 |---------|---------|
-| `AWS_REGION` | `AWSManagedControlPlane` region |
-| `PUBLIC_API_CIDR` | EKS public API allowlist (`x.x.x.x/32`) until private-only |
+| `AWS_REGION` | Both managed control planes |
+| `PUBLIC_API_CIDR` | Public API allowlist on both |
 
-SSH keys intentionally empty (SSM).
-
-## Production baseline (`capi-eks-1.yaml`)
+## Production baseline (each CAPA EKS)
 
 | Control | Value |
 |---------|--------|
 | AZs | **3** |
-| Bootstrap workers | **2** (system HA) |
+| Bootstrap workers | **2** |
 | CP logs | All five → CloudWatch |
-| Endpoint | Private + public CIDR allowlist |
-| Encryption | CMK alias (deploy `../kms` first) |
-| OIDC | On (IRSA/Pod Identity) |
-| SSH / bastion | Off |
-| Tags | `Environment=production`, `CostCenter=scke` |
+| Encryption | CMK `alias/cluster-api-provider-aws-eks-secrets` |
+| OIDC | On |
+| Pod CIDR | Services `10.96.0.0/16` · Workload `10.97.0.0/16` |
 
-App/platform capacity: **Karpenter** Reserved 5+5 + 1.5× headroom — [`../services/karpenter/`](../services/karpenter/).
+## Karpenter
+
+| Cluster | Install | Discovery tag |
+|---------|---------|-----------------|
+| Services | `aws_eks/services/karpenter/` (services pools + headroom) | `karpenter.sh/discovery: capi-eks-services` |
+| Workload | Workload NodePools / headroom (see karpenter README) | `karpenter.sh/discovery: capi-eks-workload` |
 
 ## IAM
 

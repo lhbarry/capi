@@ -1,4 +1,12 @@
-# Management plane — SUSE Rancher (production)
+# Management cluster — SUSE Rancher (production)
+
+**Cluster #1 of 3** — see [docs/clusters.md](../docs/clusters.md).
+
+| # | Cluster | Definition |
+|---|---------|------------|
+| **1** | **Management** (this tree) | RKE2 + Rancher + CAPI/CAPA |
+| 2 | Services | [`aws_eks/clusters/services/`](../aws_eks/clusters/services/) |
+| 3 | Workload | [`aws_eks/clusters/workload/`](../aws_eks/clusters/workload/) |
 
 **Decision:** [docs/adr/001-management-cluster-rancher.md](../docs/adr/001-management-cluster-rancher.md)  
 **Pins:** [VERSIONS.md](VERSIONS.md) · **Bootstrap:** [bootstrap.md](bootstrap.md) · **CAPI/CAPA:** [capa-placement.md](capa-placement.md)

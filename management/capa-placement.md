@@ -13,15 +13,16 @@
 ```text
 ┌─ Management (Ubuntu 24.04 × 3, RKE2 + Rancher) ─────────────┐
 │  Rancher Manager  (Helm)                                      │
-│  CAPI controllers + CAPA controllers  (clusterctl / Helm)     │
-│  Cluster / AWSManagedControlPlane CRs  ← aws_eks/ YAML        │
-└────────────────────────────┬──────────────────────────────────┘
-                             │ CAPA → AWS APIs
-                             ▼
-┌─ Downstream EKS (capi-eks-1) ─────────────────────────────────┐
-│  Services plane: Argo CD, Karpenter, …                        │
-│  Workload plane: apps, Knative, …                             │
-└───────────────────────────────────────────────────────────────┘
+│  CAPI + CAPA                                                  │
+│  Applies: aws_eks/clusters/services + workload                │
+└────────────┬───────────────────────────────┬──────────────────┘
+             │                               │
+             ▼                               ▼
+┌─ Services EKS ─────────────┐   ┌─ Workload EKS ──────────────┐
+│  capi-eks-services         │   │  capi-eks-workload          │
+│  Principal+AppController   │   │  Agent → Principal          │
+│  Karpenter (services)      │   │  Karpenter (workload)       │
+└────────────────────────────┘   └─────────────────────────────┘
 ```
 
 ## Why CAPI/CAPA on the local Rancher cluster
@@ -39,8 +40,8 @@
 1. Install **clusterctl** targets matching CAPA version used by this repo.  
 2. `clusterctl init --infrastructure aws` (or Helm charts) on **local** kubeconfig.  
 3. Ensure management node IAM (or IRSA) can assume CAPA controller permissions (`aws_iam/common.yaml` + `eks.yaml` as needed).  
-4. Apply `aws_eks/clusters` manifests (when intentionally provisioning).  
-5. Import / register downstream EKS in Rancher for visibility (optional; CAPA remains SoT for cluster objects).
+4. Apply **Services** then **Workload** CAPA manifests (`aws_eks/clusters/services`, `.../workload`) when intentionally provisioning.  
+5. Import both clusters in Rancher (optional; CAPA remains SoT for cluster objects).
 
 ## What does **not** run on management
 
