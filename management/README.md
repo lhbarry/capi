@@ -21,15 +21,31 @@
 
 Re-validate OS against the RKE2 support matrix for the **exact** RKE2 minor used by the pinned Rancher version before locking an AMI ID.
 
-## Sizing (pending hardware profile)
+## Sizing (verified)
 
-| Class | vCPU | RAM | Example types |
-|-------|-----:|----:|---------------|
-| Small (min prod) | 4 | 16 GiB | `m6i.xlarge`, `m7i.xlarge` |
-| Medium | 8 | 32 GiB | `m6i.2xlarge`, `m7i.2xlarge` |
-| Disk | — | — | gp3 SSD, ≥60–100 GiB root; etcd on SSD |
+Official sources:
 
-When the hardware profile lands, record it here and in the ADR.
+- [Rancher install requirements (RKE2 upstream)](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-requirements#rke2-kubernetes) — **Small = 4 vCPU / 16 GB** per node, **≥3 nodes** for production  
+- [RKE2 requirements](https://docs.rke2.io/install/requirements) — min 2/4 GB, recommend **4 / 8 GB**; SSD for etcd  
+
+### Proposed profile check: 4 vCPU / 8 GiB / 100 GiB
+
+| Spec | vs RKE2 | vs Rancher Small | Action |
+|------|---------|------------------|--------|
+| 4 vCPU | OK | OK | Keep |
+| 8 GiB RAM | OK (recommend) | **Short 8 GB** (need 16) | **Raise to 16 GiB** |
+| 100 GiB disk | OK if SSD | OK if SSD | Keep as **gp3** |
+
+### Locked production target (adapted)
+
+| Spec | Value |
+|------|--------|
+| Nodes | **3** RKE2 servers (Reserved) |
+| vCPU | **4** |
+| RAM | **16 GiB** |
+| Disk | **100 GiB gp3** SSD |
+| Instance examples | `m7i.xlarge`, `m6i.xlarge`, `m5.xlarge` |
+| Avoid | `t3`/`t3a` for etcd+Rancher (CPU credits) |
 
 ## Layout (to grow)
 
