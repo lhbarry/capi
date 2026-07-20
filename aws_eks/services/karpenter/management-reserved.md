@@ -4,29 +4,24 @@
 |-------|--------|
 | Domain | Management plane |
 | Reservation | **3 nodes Reserved** |
+| Software | **SUSE Rancher** on **RKE2** (3 server nodes) |
 | Labels | `capacity.scke.io/reservation=reserved`, `capacity.scke.io/plane=management` |
-| Scaler | **Not** Services-plane Karpenter (separate cluster) |
+| Scaler | Fixed 3; not Services-plane Karpenter |
+| Decision | [ADR-001](../../../docs/adr/001-management-cluster-rancher.md) |
+| Design tree | [`management/`](../../../management/) |
 
-## When management host is CAPA → EKS (or kubeadm)
+## AMI (AWS)
 
-Pin a MachineDeployment (or managed node group) at **`replicas: 3`** with the labels above. Prefer multi-AZ spread.
+**Preferred:** **SLE Micro** AMI (SUSE Marketplace / public cloud).  
+**Alts:** SLES 15 SP; Ubuntu 24.04 if matrix-certified for pinned RKE2; else Ubuntu 22.04.  
+**Avoid:** Amazon Linux as primary.
 
-Example shape (apply only when management product is decided — **not** wired today):
+Confirm OS against RKE2 support matrix for the pinned RKE2 version before locking AMI ID.
 
-```yaml
-# Illustrative — do not apply to workload capi-eks-1
-apiVersion: cluster.x-k8s.io/v1beta1
-kind: MachineDeployment
-metadata:
-  name: mgmt-reserved
-  labels:
-    capacity.scke.io/reservation: reserved
-    capacity.scke.io/plane: management
-spec:
-  replicas: 3
-  # ... clusterName, bootstrap, infrastructureRef for the chosen management cluster
-```
+## Sizing
 
-## Today
+Pending hardware profile. Floor from Rancher docs (small fleet): **4 vCPU / 16 GiB** per node (`m6i.xlarge` / `m7i.xlarge` class). gp3 SSD for etcd.
 
-Experimental Kind `capi-mgmt` is **not** the production management plane and does **not** satisfy the 3-node Reserved target. Choose a production management host and implement **3 Reserved** multi-AZ nodes with the labels above ([ARCHITECTURE.md](../../../ARCHITECTURE.md) §1 / §8).
+## Relation to Kind lab
+
+`clusters/capi-mgmt` is **not** this plane.

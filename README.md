@@ -12,7 +12,7 @@ Arch. adaptation from On-Prem to AWS Cloud Services Hosting — **Cluster API + 
   <img src="docs/architecture.svg" alt="SCKE Transformative Architecture — click for full SVG" width="720" />
 </a>
 
-**Management:** host product **TBD**; capacity target **3 nodes Reserved**. Do not treat experimental `clusters/capi-mgmt` as the production management plane.
+**Management:** **SUSE Rancher** on **RKE2**, **3 nodes Reserved** ([ADR-001](docs/adr/001-management-cluster-rancher.md) · [`management/`](management/)). Experimental `clusters/capi-mgmt` (Kind) is not production.
 
 ## Primary path: EKS + Services plane (production)
 

@@ -107,7 +107,7 @@ Items that might join the Services plane later (or stay eliminated). Not side-ra
 | Serverless / scale-to-zero | **Knative** (committed, Workload) | Lambda; KEDA-only | `elected-oss` | On Workload plane |
 | Certificate lifecycle in-cluster | cert-manager | ACM | `candidate` | |
 | Secrets CSI (pod mount) | Secrets Store CSI Driver | External Secrets | `candidate` | May eliminate if ESO-only |
-| GitOps for mgmt cluster | Flux / Argo on mgmt | Management TBD | `candidate` | Blocked on management decision |
+| GitOps for mgmt cluster | Flux / Argo on mgmt | Rancher + optional GitOps | `candidate` | Management host = Rancher/RKE2 (ADR-001); GitOps tool on mgmt still open |
 | Cost visibility | OpenCost / Kubecost | AWS Cost Explorer | `candidate` | |
 
 ---
@@ -138,6 +138,7 @@ Move candidates here with a date and reason. Reopen only with a new need stateme
 | 2026-07-20 | KMS CMK (EKS secrets) | hybrid | CAPA encryptionConfig + `aws_eks/kms`; OpenBao for app secrets |
 | 2026-07-20 | CloudWatch (EKS CP logs) | hybrid | CAPA logging all five; LGTM still target for app telemetry |
 | 2026-07-20 | IRSA foundation | candidate (partial) | OIDC associated on CAPA EKS; per-service roles later |
+| 2026-07-20 | Management plane host | **SUSE Rancher / RKE2** | ADR-001; 3 Reserved; AMI prefer SLE Micro |
 
 ---
 

@@ -14,7 +14,7 @@ This document is the **production design** for **Cluster API + CAPA** → **Amaz
 
 > **Self-managed EC2 (`aws_ec2/`):** secondary. Intended to **mirror this EKS production design** later; not the focus of this document.
 
-> **Management cluster:** **TBD product**, with a fixed capacity target of **3 Reserved nodes**. Repo `clusters/capi-mgmt/` is historical/experimental only — not the production management commitment.
+> **Management cluster:** **SUSE Rancher on RKE2**, **3 nodes Reserved** (all servers / etcd quorum). See [ADR-001](docs/adr/001-management-cluster-rancher.md) and [`management/`](management/). Repo `clusters/capi-mgmt/` (Kind + Flux) is historical only.
 
 ---
 
@@ -30,7 +30,7 @@ Design and implement **production-grade create/manage of EKS on AWS** with:
 | Workers | CAPA bootstrap nodes + **Karpenter** for Reserved Services/Workload capacity |
 | Services plane | Shared platform on EKS: CI/CD, compute (Karpenter), data, registry, identity, observability (see §7) |
 | Desired state | Git (this repository) for CAPA YAML, IAM, and Services manifests |
-| Management plane | **TBD host**, **3 nodes Reserved** capacity target |
+| Management plane | **SUSE Rancher** on **RKE2**, **3 nodes Reserved** ([ADR-001](docs/adr/001-management-cluster-rancher.md)) |
 | CAPA IAM | CloudFormation under `aws_iam/` only |
 | WAF goal | High maturity across all six pillars (scorecard in §1.1) |
 
@@ -59,7 +59,7 @@ Design and implement **production-grade create/manage of EKS on AWS** with:
   ┌ On Prem ────┐                                          ┌ AWS Services ─┐
   │ AD/LDAP     │   Git · aws_eks/ · aws_iam/ · docs       │ EFS CSI (RWX) │
   │ SMTP        │                                          │ EBS CSI (HP)  │
-  │ MS Teams    │   Management TBD    Identity CFN         │ S3            │
+  │ MS Teams    │   Rancher/RKE2×3    Identity CFN         │ S3            │
   │             │         │                    │           │               │
   │             │         ▼                    ▼           │               │
   │             │   Services plane (on EKS) …              │               │
@@ -74,7 +74,7 @@ Same diagram as SVG: [docs/architecture.svg](docs/architecture.svg).
 | Layer | Kind | Where | What lives there |
 |-------|------|-------|------------------|
 | **Source of truth** | Plane | Git Repo | EKS CAPA YAML, IAM templates, docs; services manifests (target) |
-| **Management** | Plane | **TBD** | Empty by design — CAPI/CAPA host not decided |
+| **Management** | Plane | **SUSE Rancher / RKE2** (3 EC2, multi-AZ) | Rancher Manager + CAPI/CAPA; provisions downstream EKS |
 | **Identity bootstrap** | Plane | AWS IAM via CloudFormation | CAPA controllers + EKS CP role + node instance profile |
 | **Services** | Plane | On the EKS cluster (above Workload on diagram) | Platform services: **CI/CD** (Argo CD Principal + Agent), **Karpenter**, **Velero**, secrets, data, registry, identity, observability — see §7 |
 | **Workload** | Plane | AWS EKS (bottom of diagram) | Network, managed CP, CAPA workers, **Argo CD Agent**, **Knative**, **Velero** |
@@ -89,18 +89,17 @@ Same diagram as SVG: [docs/architecture.svg](docs/architecture.svg).
 
 ```text
 1. Edit YAML in git (aws_eks cluster specs, aws_iam templates, later services)
-2. CAPA (once a management host exists) reconciles CAPA CRs → EKS + VPC + workers
+2. CAPA on management (Rancher/RKE2) reconciles CAPA CRs → EKS + VPC + workers
 3. Operator (when IAM changes):
       aws cloudformation deploy --template-file aws_iam/*.yaml
-4. Services plane on EKS (Argo CD Principal + Agent + peers) delivers
+4. Services plane on downstream EKS (Argo CD Principal + Agent + peers) delivers
    platform services and applications from git onto the cluster
 ```
 
-Cluster lifecycle **tooling and management host are TBD**. What *is* fixed:
-
 | Layer | Commitment |
 |-------|------------|
-| Workload cluster shape | CAPA → Amazon EKS + EC2 workers (`aws_eks/`) |
+| Management cluster | **SUSE Rancher** on **RKE2**, 3 Reserved nodes ([ADR-001](docs/adr/001-management-cluster-rancher.md)) |
+| Workload / Services cluster shape | CAPA → Amazon EKS + bootstrap + Karpenter (`aws_eks/`) |
 | IAM for CAPA | CloudFormation in `aws_iam/` |
 | Services + app CD | Argo CD Principal + Agent **on the Services plane (EKS)** |
 
@@ -112,13 +111,14 @@ IAM is deployed with the AWS CLI from templates in git (YAML-first, not console-
 
 | Path | Owns | Applied by |
 |------|------|------------|
-| [`aws_eks/`](aws_eks/) | **Primary** — EKS CAPA cluster manifests | TBD management path (CAPA) |
+| [`management/`](management/) | Production management plane (Rancher / RKE2 design) | Day-0 + Rancher ops (grows) |
+| [`aws_eks/`](aws_eks/) | Downstream EKS CAPA + Services | CAPA on management → AWS |
 | [`aws_iam/`](aws_iam/) | CAPA IAM CloudFormation | `aws cloudformation deploy` |
 | [`aws_ec2/`](aws_ec2/) | Secondary / future mirror of this design | Not the architecture focus |
-| [`clusters/capi-mgmt/`](clusters/capi-mgmt/) | **Historical / experimental** mgmt material | **Not** the production management plane |
+| [`clusters/capi-mgmt/`](clusters/capi-mgmt/) | **Historical** Kind + Flux lab | **Not** production management |
 | [`local/`](local/) | Notes, secrets, reference clones | Never commit |
 
-Architecture does **not** treat `clusters/capi-mgmt` as the decided management product — leave that box empty until chosen.
+Management product is **SUSE Rancher / RKE2** ([ADR-001](docs/adr/001-management-cluster-rancher.md)). Kind path is provenance only.
 
 ---
 
@@ -219,7 +219,7 @@ Shared **platform services** that run on the EKS workload cluster. They are not 
 
 | Domain | Reserved nodes | Owner / mechanism |
 |--------|---------------:|-------------------|
-| **Management** cluster | **3** | Fixed capacity when mgmt host is chosen — labels `capacity.scke.io/reservation=reserved`, `plane=management` ([management-reserved.md](aws_eks/services/karpenter/management-reserved.md)) |
+| **Management** cluster | **3** | RKE2 servers under **SUSE Rancher** — labels `capacity.scke.io/reservation=reserved`, `plane=management` ([ADR-001](docs/adr/001-management-cluster-rancher.md)) |
 | **Services** plane | **5** | Karpenter NodePool `reserved-services` + 5× pause overprovisioning |
 | **Workload** plane | **5** | Karpenter NodePool `reserved-workload` + 5× pause overprovisioning |
 | **Waiting headroom** | **≥ 1.5 × one worker** CPU **and** RAM | Karpenter `elastic` NodePool + preemptible pause pod (**3 vCPU / 12 GiB** vs reference `t3.large` 2 / 8 GiB) |
@@ -352,7 +352,7 @@ Add more rows here and on the SVG as the platform grows.
 
 | Dimension | Production design (target in-repo) | Status |
 |-----------|-----------------------------------|--------|
-| Management plane | Chosen host + **3 Reserved** nodes, backups, restricted API | Host **TBD**; capacity target set |
+| Management plane | **SUSE Rancher / RKE2**, **3 Reserved**, multi-AZ, backups, restricted API | Host **decided** (ADR-001); AMI/instance pin open |
 | Cluster lifecycle | CAPA → EKS + policy gates + promotion envs | CAPA YAML present; gates open |
 | Services / app CD | Argo CD HA on Services plane | Design; manifests next |
 | VPC / AZ | **3 AZs**; VPC endpoints vs NAT as cost/security tradeoff | YAML → 3 AZ |
@@ -392,7 +392,7 @@ Add more rows here and on the SVG as the platform grows.
 2. **EKS is the product path** — CAPA → EKS; `aws_ec2` mirrors later.  
 3. **Services plane is first-class** — including CI/CD and Karpenter.  
 4. **Reserved capacity is intentional** — 3 / 5 / 5 + 1.5× headroom is the production floor, not waste to eliminate casually.  
-5. **Management host TBD, capacity not** — 3 Reserved nodes; do not treat experimental Kind path as the product.  
+5. **Management is SUSE Rancher / RKE2** — 3 Reserved nodes; Kind path is not the product.  
 6. **YAML first** — AWS and platform changes come from git.  
 7. **IAM is central for CAPA** — `aws_iam/` only; per-service IRSA/Pod Identity is mandatory for production Services.  
 8. **No secrets in git**.  
@@ -419,7 +419,7 @@ Add more rows here and on the SVG as the platform grows.
 **Current phase:** production design for **high WAF score**. Prefer order:
 
 1. Lock production substrate (3 AZ, bootstrap HA, CMK, endpoint, tags) — **in progress in YAML**  
-2. Decide **management plane host** (capacity already **3 Reserved**)  
+2. **Management plane** — SUSE Rancher / RKE2 (**decided** ADR-001); pin AMI (prefer SLE Micro) + instance type from hardware profile; day-0 IaC  
 3. **Karpenter** production path — NodePools + Reserved 5/5 + 1.5× headroom (**manifests present**; controller IRSA + discovery tags next)  
 4. **Argo CD** Principal + Agent (Services) — unlocks the rest of the plane  
 5. Peer services via Argo: secrets (OpenBao+ESO), IdP, Harbor, CNPG, Velero, OTel+LGTM  
