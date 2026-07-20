@@ -21,10 +21,11 @@ spec:
         karpenter.sh/discovery: capi-eks-1
   tags:
     Project: scke
-    Environment: lab
+    Environment: production
     Workload: capi-eks-1
     ManagedBy: karpenter
-    CostCenter: scke-lab
+    CostCenter: scke
+    Phase: production-design
   metadataOptions:
     httpEndpoint: enabled
     httpProtocolIPv6: disabled

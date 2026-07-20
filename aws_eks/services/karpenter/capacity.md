@@ -1,31 +1,29 @@
-# Capacity model — Reserved nodes + Karpenter headroom
+# Capacity model — production Reserved nodes + Karpenter headroom
 
-## Goals
+## Goals (production / WAF)
 
-1. **Reserved** baseline capacity for three domains (not free-for-all consolidation).  
-2. **Karpenter** on the **Services plane** scales EC2 so real workloads can land without waiting cold.  
-3. Keep **≥ 1.5 × one worker node** of CPU **and** memory **available and waiting** (preemptible headroom).
+1. **Reserved** baseline capacity for three domains (Reliability + Operational Excellence).  
+2. **Karpenter** on the **Services plane** scales EC2 so platform and apps land without cold start.  
+3. Keep **≥ 1.5 × one worker node** of CPU **and** memory **available and waiting** (preemptible headroom — Performance + Reliability under burst).
+
+This is the **production capacity floor**, not a lab experiment. Cost is governed with tags, budgets, and elastic consolidation — not by collapsing Reserved floors.
 
 ## Reference worker
 
 | Field | Value | Source |
 |-------|-------|--------|
-| Instance | `t3.large` | `aws_eks/clusters/capi-eks-1.yaml` AWSMachineTemplate |
+| Instance | `t3.large` | Bootstrap `AWSMachineTemplate` + NodePool family |
 | vCPU | 2 | AWS instance shape |
 | Memory | 8 GiB | AWS instance shape |
-| **1.5 × worker headroom** | **3 vCPU + 12 GiB** | This model |
-
-Headroom uses **instance-shape** requests (not kube-reserved allocatable). Slight over-ask is intentional so Karpenter keeps a full extra node class ready under load.
+| **1.5 × worker headroom** | **3 vCPU + 12 GiB** | Waiting capacity |
 
 ## Reservations
 
 | Domain | Count | Label / taint plane | Status |
 |--------|------:|---------------------|--------|
-| Management cluster | **3** | `capacity.scke.io/plane=management` | **Reserved** — management host (TBD); not Karpenter on workload EKS |
-| Services plane | **5** | `capacity.scke.io/plane=services` | **Reserved** — Karpenter NodePool `reserved-services` |
-| Workload plane | **5** | `capacity.scke.io/plane=workload` | **Reserved** — Karpenter NodePool `reserved-workload` |
-
-Common reservation label on reserved nodes:
+| Management cluster | **3** | `capacity.scke.io/plane=management` | **Reserved** — management host TBD; fixed capacity |
+| Services plane | **5** | `capacity.scke.io/plane=services` | **Reserved** — NodePool `reserved-services` |
+| Workload plane | **5** | `capacity.scke.io/plane=workload` | **Reserved** — NodePool `reserved-workload` |
 
 ```text
 capacity.scke.io/reservation=reserved
@@ -33,41 +31,40 @@ capacity.scke.io/reservation=reserved
 
 ### Management (3 Reserved)
 
-- Applies to the **management cluster** once chosen (not Kind-as-architecture).  
-- Target: **3** nodes marked Reserved for CAPI/CAPA/Flux (or successor) control plane.  
-- Implementation when mgmt is CAPA/EKS: fixed MachineDeployment `replicas: 3` + labels above (see `management-reserved.md`).  
-- **Not** scaled by the Services-plane Karpenter instance (different cluster).
+- Separate **management cluster** (host product still TBD).  
+- Target: **3** multi-AZ nodes for CAPI/CAPA/GitOps control plane.  
+- See `management-reserved.md`. **Not** scaled by Services-plane Karpenter.
 
 ### Services & Workload (5 + 5 Reserved)
 
-On the **Services Cluster** (EKS that hosts Services + Workload planes):
+On the EKS cluster that hosts Services + Workload:
 
-1. Karpenter **NodePools** `reserved-services` and `reserved-workload` with matching labels/taints.  
-2. **Overprovisioning** Deployments (`overprovisioning/`) with:
-   - low `PriorityClass` (preemptible),
-   - resource requests ≈ one `t3.large` each,
-   - required pod anti-affinity on hostname → **one pause pod per node**,
-   - `replicas: 5` per plane → **minimum 5 nodes** per pool while pause pods exist.  
-3. Real Services/Workload pods use higher priority + plane nodeSelector/tolerations; they **preempt** pause pods; Karpenter replaces capacity via headroom + pending demand.
+1. Karpenter **NodePools** with labels/taints per plane.  
+2. **Overprovisioning** Deployments: low priority, ~one worker resources each, hostname anti-affinity, `replicas: 5` → holds **5 nodes** per plane.  
+3. Real pods use higher priority + plane tolerations; they preempt pause pods; Karpenter + headroom absorb the shock.
 
-NodePool `limits` cap each reserved pool (cpu/memory sized for ~5 × t3.large) so reservations do not unbounded-grow.
+NodePool `limits` cap each reserved pool (~5 × t3.large).
 
 ### Headroom (1.5 × worker, waiting)
 
-Deployment `headroom-overprovision` requests **3 CPU + 12 GiB** total (single pod or equivalent), lowest priority, scheduled on the **elastic** NodePool (or any schedulable Karpenter node without exclusive taints).
+`headroom-overprovision` requests **3 CPU + 12 GiB** on the **elastic** pool (lowest priority).
 
-- While idle: that capacity sits **available and waiting**.  
-- When burst demand arrives: headroom pods are preempted; real pods schedule; Karpenter scales out; headroom pods reschedule → refill buffer.
+- Idle: capacity is **available and waiting**.  
+- Burst: preempt → schedule real work → Karpenter scales → headroom refills.
 
 ## Bootstrap vs Karpenter
 
-| Layer | Role |
-|-------|------|
-| CAPA `MachineDeployment` | Bootstrap / system (run Karpenter controller, CoreDNS, etc.). Lab may stay `replicas: 1+`. |
-| Karpenter | Reserved Services/Workload pools + elastic headroom and burst |
+| Layer | Role | Production |
+|-------|------|------------|
+| CAPA `MachineDeployment` | Bootstrap / system | **2** replicas multi-AZ (HA for Karpenter, CoreDNS, CNI) |
+| Karpenter | Reserved + elastic | **5 + 5 Reserved** + **1.5×** headroom + burst |
 
-Do not consolidate away Reserved pause-backed capacity aggressively; reserved NodePools use longer `consolidateAfter` and do-not-disrupt where needed.
+Do not treat Reserved pause capacity as “waste” to consolidate away; reserved pools use conservative disruption.
 
-## Cost note (lab)
+## Cost governance (production)
 
-Full reserved floor ≈ **3 (mgmt) + 5 (services) + 5 (workload) + headroom (~1–2)** nodes plus bootstrap — **not** the old 1-worker lab floor. Use only when intentionally leaving pure-dev; keep manifests unapplied under Flux until then.
+Full floor ≈ **3 (mgmt) + 2 (bootstrap) + 5 (services) + 5 (workload) + headroom (~1–2)** nodes.
+
+- Tags: `Project`, `Environment=production`, `CostCenter=scke`  
+- Budgets: `aws_cost/`  
+- Consolidate **elastic** aggressively; **Reserved** slowly / when empty only  

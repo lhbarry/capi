@@ -1,25 +1,24 @@
-# Services plane (on EKS)
+# Services plane (on EKS) — production design
 
-Platform capabilities that run **on the CAPA-provisioned EKS cluster** (Services plane in [ARCHITECTURE.md](../../ARCHITECTURE.md)).
+Platform capabilities on the CAPA-provisioned EKS cluster. Lab phase complete; this tree is the **production Services plane** implementation path for a **high WAF** score.
 
-**Not Flux-wired today.** Flux only reconciles `aws_eks/clusters/`. Enabling these manifests is a deliberate apply (Argo CD later, or kubectl) — safe in pure-dev.
+**Delivery:** not under Flux `aws_eks/clusters` yet. Prefer Argo CD (once landed) or explicit apply. Do not confuse experimental Kind Flux jobs with the production CD design.
 
 ## Layout
 
-| Path | Purpose |
-|------|---------|
-| [`karpenter/`](karpenter/) | Node autoscaling (Compute) — NodePools, EC2NodeClass, reserved capacity, headroom |
-| (future) | Argo CD, Velero, secrets, IdP, Harbor, CNPG, OTel, LGTM |
+| Path | Purpose | Status |
+|------|---------|--------|
+| [`karpenter/`](karpenter/) | Compute — Reserved 5/5 + 1.5× headroom | Manifests present |
+| (next) Argo CD | GitOps CD Principal + Agent | Design in ARCHITECTURE §7 |
+| (next) peers | Velero, OpenBao, ESO, Harbor, Keycloak, CNPG, OTel, LGTM | Design bar in ARCHITECTURE §7 |
 
-## Capacity model (summary)
+## Capacity (production floor)
 
-| Domain | Reservation | How |
-|--------|-------------|-----|
-| **Management** cluster | **3 nodes Reserved** | Fixed capacity target for the management plane (host TBD) |
-| **Services** plane | **5 nodes Reserved** | Karpenter NodePool + overprovisioning pause pods |
-| **Workload** plane | **5 nodes Reserved** | Karpenter NodePool + overprovisioning pause pods |
-| **Headroom** (waiting) | **≥ 1.5 × one worker** CPU + RAM free | Cluster-wide overprovisioning (preemptible) |
+| Domain | Reservation |
+|--------|------------:|
+| Management cluster | **3 Reserved** |
+| Services plane | **5 Reserved** |
+| Workload plane | **5 Reserved** |
+| Waiting headroom | **≥ 1.5 × one worker** CPU + RAM |
 
-Reference worker size (CAPA bootstrap / NodePool family): **`t3.large`** → 2 vCPU, 8 GiB → headroom **3 vCPU, 12 GiB**.
-
-Details: [`karpenter/capacity.md`](karpenter/capacity.md).
+See [`karpenter/capacity.md`](karpenter/capacity.md) and [ARCHITECTURE.md §1.1](../../ARCHITECTURE.md) (WAF targets).

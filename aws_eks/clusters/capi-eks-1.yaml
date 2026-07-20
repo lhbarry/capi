@@ -1,10 +1,12 @@
-# CAPA EKS workload cluster — applied ONLY via Flux (aws-eks-clusters → Kind → CAPA → AWS).
-# Generated from: clusterctl generate cluster --infrastructure aws --flavor eks
-# Lab cost: 2 AZs / 2 NATs (EKS minimum AZs).
+# CAPA EKS — production design baseline (Services + Workload substrate).
+# Origin: clusterctl generate --flavor eks; evolved from completed lab phase.
 #
-# WA substrate hardens (dev — do not enable Flux resources until ready to create AWS):
-#   logging, endpointAccess, encryptionConfig (CMK), tags, no SSH, OIDC for IRSA later.
-# Prerequisites when applying: deploy aws_eks/kms first; set PUBLIC_API_CIDR in kustomization.
+# Production WAF substrate:
+#   3 AZ, bootstrap HA, logging, endpoint allowlist, CMK encryption, OIDC, SSM-only, tags.
+# Capacity: CAPA bootstrap for system; Karpenter owns 5 Reserved services + 5 Reserved workload
+#   + 1.5× worker headroom (aws_eks/services/karpenter/).
+#
+# Apply path: enable Flux resources only when intentionally creating AWS; deploy aws_eks/kms first.
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: Cluster
@@ -12,8 +14,9 @@ metadata:
   name: capi-eks-1
   namespace: default
   labels:
-    capa.lab/path: aws-eks
-    capa.lab/cost-center: scke-lab
+    capa.scke/path: aws-eks
+    capa.scke/cost-center: scke
+    capa.scke/phase: production-design
 spec:
   clusterNetwork:
     pods:
@@ -43,42 +46,41 @@ metadata:
 spec:
   region: PLACEHOLDER_AWS_REGION
   version: v1.34.1
-  # Bastion SSH: empty string = do not attach a key (prefer SSM on nodes when live).
+  # No standing SSH / bastion — SSM on nodes (WAF SEC).
   sshKeyName: ""
   bastion:
     enabled: false
-  # OIDC provider for future IRSA / Pod Identity work.
+  # OIDC for IRSA / Pod Identity (required for production Services).
   associateOIDCProvider: true
-  # Lab: private + public with CIDR allowlist (Kind mgmt is outside VPC).
-  # Prod target: private-only once management is in-VPC / VPN.
+  # Private always; public only with tight CIDR until management is in-VPC (then private-only).
   endpointAccess:
     private: true
     public: true
     publicCIDRs:
     - PLACEHOLDER_PUBLIC_API_CIDR
-  # Control-plane logs → CloudWatch (all five).
+  # Control-plane logs → CloudWatch (WAF SEC / OPS).
   logging:
     apiServer: true
     audit: true
     authenticator: true
     controllerManager: true
     scheduler: true
-  # Secrets encryption at rest. Deploy aws_eks/kms CFN before cluster create.
-  # Alias matches CAPA controllers-eks KMS grant condition (alias/cluster-api-provider-aws-*).
+  # Secrets encryption at rest — deploy aws_eks/kms before cluster create.
   encryptionConfig:
     provider: alias/cluster-api-provider-aws-eks-secrets
     resources:
     - secrets
   additionalTags:
     Project: scke
-    Environment: lab
+    Environment: production
     Workload: capi-eks-1
     ManagedBy: capa
-    CostCenter: scke-lab
+    CostCenter: scke
+    Phase: production-design
   network:
     vpc:
-      # EKS requires subnets in ≥2 AZs. Lab cost: 2 AZs ⇒ 2 NATs (not 3).
-      availabilityZoneUsageLimit: 2
+      # Production HA: 3 AZs (WAF REL). NAT cost is accepted for the design floor.
+      availabilityZoneUsageLimit: 3
       availabilityZoneSelection: Ordered
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
@@ -86,9 +88,12 @@ kind: MachineDeployment
 metadata:
   name: capi-eks-1-md-0
   namespace: default
+  labels:
+    capacity.scke.io/role: bootstrap-system
 spec:
   clusterName: capi-eks-1
-  replicas: 1
+  # Bootstrap / system HA (Karpenter, CoreDNS, CNI). App capacity is Karpenter Reserved pools.
+  replicas: 2
   selector:
     matchLabels: null
   template:
@@ -119,19 +124,18 @@ spec:
         eksLookupType: AmazonLinux2023
       iamInstanceProfile: nodes.cluster-api-provider-aws.sigs.k8s.io
       instanceType: t3.large
-      # No standing SSH — use SSM Session Manager when nodes exist (node role has SSM policy).
       sshKeyName: ""
       publicIP: false
-      # AL2023 + CAPA: required when not using secrets-manager bootstrap path.
       cloudInit:
         insecureSkipSecretsManager: true
       additionalTags:
         Project: scke
-        Environment: lab
+        Environment: production
         Workload: capi-eks-1
         ManagedBy: capa
-        CostCenter: scke-lab
-        Role: worker
+        CostCenter: scke
+        Role: bootstrap-system
+        Phase: production-design
 ---
 apiVersion: bootstrap.cluster.x-k8s.io/v1beta2
 kind: NodeadmConfigTemplate

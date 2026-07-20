@@ -1,8 +1,8 @@
-# Lab cost guardrails
+# Cost guardrails (production design)
 
-CloudFormation for a simple monthly **AWS Budget** alarm for the CAPA lab.
+CloudFormation for a monthly **AWS Budget** alarm for the SCKE platform (WAF Cost Optimization).
 
-## Deploy (only when leaving pure-dev / ready for AWS)
+## Deploy (with production environment)
 
 Not wired to Flux:
 
@@ -11,7 +11,7 @@ export AWS_REGION="${AWS_REGION:-us-east-2}"
 
 aws cloudformation deploy \
   --stack-name scke-lab-budget \
-  --template-file aws_cost/lab-budget.yaml \
+  --template-file aws_cost/production-budget.yaml \
   --parameter-overrides MonthlyBudgetAmount=50 AlertEmail=you@example.com \
   --no-fail-on-empty-changeset
 ```

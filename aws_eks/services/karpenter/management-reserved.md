@@ -27,6 +27,6 @@ spec:
   # ... clusterName, bootstrap, infrastructureRef for the chosen management cluster
 ```
 
-## Lab today
+## Today
 
-Experimental Kind `capi-mgmt` is **not** the architectural management plane and does not implement the 3-node Reserved target. Track the target here until a host is chosen ([ARCHITECTURE.md](../../../ARCHITECTURE.md)).
+Experimental Kind `capi-mgmt` is **not** the production management plane and does **not** satisfy the 3-node Reserved target. Choose a production management host and implement **3 Reserved** multi-AZ nodes with the labels above ([ARCHITECTURE.md](../../../ARCHITECTURE.md) §1 / §8).

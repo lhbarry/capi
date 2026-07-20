@@ -2,36 +2,54 @@
 
 **Arch. adaptation from On-Prem to AWS Cloud Services Hosting.**
 
-This document describes the architecture: **Cluster API + CAPA** provisioning of **Amazon EKS**, plus a **Services plane** of shared platform capabilities (including CI/CD) on that cluster.
+This document is the **production design** for **Cluster API + CAPA** → **Amazon EKS**, plus a **Services plane** of shared platform capabilities (including CI/CD) on that cluster.
 
 **Visual overview:** [docs/architecture.svg](docs/architecture.svg)
 
-**Audience:** operators of this lab, and interview / portfolio review of the design.
+**Audience:** platform architects and operators implementing or reviewing this production system.
 
-**Criticality:** lab / learning / demonstration — not a production multi-account platform. Lab vs production targets are explicit below.
+**Criticality:** **production** — high [AWS Well-Architected Framework](https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html) (WAF) posture is a design goal (see §1.1).  
 
-> **Self-managed EC2 (`aws_ec2/`):** secondary. Intended to **mirror this EKS design** later; not the focus of this document.
+**Provenance:** A CAPA/EKS **lab phase is complete** (IAM split, EKS scaffold, Flux experiment, substrate hardens). That work is the foundation. **Current phase builds on it toward a high WAF–rated production design** — not another lab.
 
-> **Management cluster:** **TBD** — not fixed in this architecture. Repo may still contain experimental mgmt paths; they are not the design commitment.
+> **Self-managed EC2 (`aws_ec2/`):** secondary. Intended to **mirror this EKS production design** later; not the focus of this document.
+
+> **Management cluster:** **TBD product**, with a fixed capacity target of **3 Reserved nodes**. Repo `clusters/capi-mgmt/` is historical/experimental only — not the production management commitment.
 
 ---
 
 ## 1. Purpose
 
-Prove and document **creating and managing EKS on AWS** with:
+Design and implement **production-grade create/manage of EKS on AWS** with:
 
 | Concern | Choice |
 |---------|--------|
 | Cluster lifecycle API | [Cluster API](https://cluster-api.sigs.k8s.io/) (CAPI) |
 | AWS provider | [CAPA](https://cluster-api-aws.sigs.k8s.io/) |
 | Control plane | **Amazon EKS** via CAPA `AWSManagedControlPlane` |
-| Workers | CAPA `MachineDeployment` on **EC2** (AL2023 EKS AMI lookup) |
-| Services plane | Shared platform on EKS: CI/CD, data, registry, identity, observability (see §7) |
-| Desired state | Git (this repository) for CAPA YAML, IAM, and (target) services |
-| Management plane | **TBD** (empty / undecided) |
+| Workers | CAPA bootstrap nodes + **Karpenter** for Reserved Services/Workload capacity |
+| Services plane | Shared platform on EKS: CI/CD, compute (Karpenter), data, registry, identity, observability (see §7) |
+| Desired state | Git (this repository) for CAPA YAML, IAM, and Services manifests |
+| Management plane | **TBD host**, **3 nodes Reserved** capacity target |
 | CAPA IAM | CloudFormation under `aws_iam/` only |
+| WAF goal | High maturity across all six pillars (scorecard in §1.1) |
 
-**Non-goals (today):** multi-account landing zone, multi-region DR, full production security baseline, customer application platform, self-managed kubeadm as the primary story, a committed management-cluster product.
+**In scope for production design:** multi-AZ substrate, explicit security baseline, reserved capacity + headroom, Services plane, observability, backup, least-privilege identity path, cost governance.
+
+**Deferred (not abandoned):** multi-account landing zone, multi-region active-active DR (decide only if business requires), full customer multi-tenant SaaS packaging.
+
+### 1.1 Well-Architected production target
+
+| Pillar | Target maturity (1–5) | Production design emphasis |
+|--------|----------------------:|----------------------------|
+| Operational Excellence | **≥ 4** | GitOps, policy gates, runbooks, progressive delivery (Argo), CI validation |
+| Security | **≥ 4** | Private API where possible, CP logs, CMK secrets, SSM-only, IRSA/Pod Identity, detection |
+| Reliability | **≥ 4** | 3 AZ, Reserved 3/5/5 capacity, 1.5× headroom, Velero + restore drills, multi-node HA |
+| Performance Efficiency | **≥ 3.5** | Karpenter right-sizing, Knative where fit, measured scaling |
+| Cost Optimization | **≥ 3.5** | Tags, budgets, Karpenter consolidation on elastic, VPC endpoints vs NAT tradeoff |
+| Sustainability | **≥ 3.5** | Right-size, scale-to-zero where safe (Knative), avoid idle waste outside Reserved floors |
+
+**Overall target:** **≥ 3.8 / 5** with **no open Critical** findings on the production path. Lab-era score (~2.6 design) is baseline; close gaps deliberately (this document + manifests).
 
 ---
 
@@ -97,7 +115,7 @@ IAM is deployed with the AWS CLI from templates in git (YAML-first, not console-
 | [`aws_eks/`](aws_eks/) | **Primary** — EKS CAPA cluster manifests | TBD management path (CAPA) |
 | [`aws_iam/`](aws_iam/) | CAPA IAM CloudFormation | `aws cloudformation deploy` |
 | [`aws_ec2/`](aws_ec2/) | Secondary / future mirror of this design | Not the architecture focus |
-| [`clusters/capi-mgmt/`](clusters/capi-mgmt/) | **Lab / experimental** mgmt material | **Not** the architectural management plane |
+| [`clusters/capi-mgmt/`](clusters/capi-mgmt/) | **Historical / experimental** mgmt material | **Not** the production management plane |
 | [`local/`](local/) | Notes, secrets, reference clones | Never commit |
 
 Architecture does **not** treat `clusters/capi-mgmt` as the decided management product — leave that box empty until chosen.
@@ -114,9 +132,9 @@ Architecture does **not** treat `clusters/capi-mgmt` as the decided management p
 | `capa-iam-eks` | `eks.yaml` | EKS control-plane role + controllers-eks policy (**required**) |
 | `capa-iam-ec2` | `ec2-self-managed.yaml` | Supplies **node** instance profile `nodes.cluster-api-provider-aws.sigs.k8s.io` used by current EKS worker flavor |
 
-| Lab | Stacks |
+| Path | Stacks |
 |-----|--------|
-| EKS lab (current flavor) | `common` + `eks` + `ec2` (for node profile) |
+| EKS production path (current flavor) | `common` + `eks` + `ec2` (node profile + SSM) |
 
 Details: [`aws_iam/README.md`](aws_iam/README.md).
 
@@ -129,7 +147,7 @@ Services plane will need **additional** identities (IRSA / Pod Identity, Harbor 
 **Intent:** CAPA **`AWSManagedControlPlane`** (EKS) + CAPA **`MachineDeployment`** workers on EC2. This is the substrate for the **Services plane**.
 
 Canonical cluster: [`aws_eks/clusters/capi-eks-1.yaml`](aws_eks/clusters/capi-eks-1.yaml)  
-(Generated from `clusterctl generate cluster --infrastructure aws --flavor eks`, then lab-tuned.)
+(Origin: `clusterctl generate` eks flavor; evolved through lab; **now production design baseline**.)
 
 ### Object graph
 
@@ -138,43 +156,54 @@ Cluster (capi-eks-1)
   ├── controlPlaneRef → AWSManagedControlPlane   (EKS)
   └── infrastructureRef → AWSManagedCluster
 
-MachineDeployment (capi-eks-1-md-0)
+MachineDeployment (capi-eks-1-md-0)          # bootstrap / system (Karpenter, CoreDNS, …)
   ├── bootstrap → NodeadmConfigTemplate
   └── infrastructureRef → AWSMachineTemplate
         ami.eksLookupType: AmazonLinux2023
         iamInstanceProfile: nodes.cluster-api-provider-aws.sigs.k8s.io
+
+Karpenter (Services plane)                  # Reserved 5 services + 5 workload + 1.5× headroom
+  ├── EC2NodeClass default
+  ├── NodePool reserved-services | reserved-workload | elastic
+  └── overprovisioning pause pods
 ```
 
 | Resource | Manifest |
 |----------|----------|
 | `Cluster` + `AWSManagedCluster` | `aws_eks/clusters/capi-eks-1.yaml` |
-| `AWSManagedControlPlane` | same — region, version, VPC AZ limits |
-| `MachineDeployment` + `AWSMachineTemplate` + `NodeadmConfigTemplate` | same |
+| `AWSManagedControlPlane` | same — region, version, VPC AZ limits, hardens |
+| Bootstrap MD + `AWSMachineTemplate` + `NodeadmConfigTemplate` | same |
+| Karpenter capacity | `aws_eks/services/karpenter/` |
 | Worker AMI | `eksLookupType: AmazonLinux2023` (EKS 1.34+) |
 
-### Lab topology knobs (current)
+### Production topology knobs (design baseline)
 
-| Knob | Lab value | Why |
-|------|-----------|-----|
-| `network.vpc.availabilityZoneUsageLimit` | `2` | EKS needs ≥2 AZs; **two NATs** = cost floor |
+| Knob | Production value | Why |
+|------|------------------|-----|
+| `network.vpc.availabilityZoneUsageLimit` | `3` | Production HA / fault isolation (WAF REL) |
 | `availabilityZoneSelection` | `Ordered` | Predictable AZ pick |
-| Worker `replicas` | `1` | Lab cost (not HA for apps) |
+| Bootstrap worker `replicas` | `2` | HA for system pods (Karpenter, CNI, CoreDNS) until node role splits |
 | Kubernetes version | `v1.34.1` | Pinned in CAPA + MD |
-| Instance type | `t3.large` | Lab default |
+| Reference instance | `t3.large` (or equal family) | Unit for Reserved sizing + 1.5× headroom math |
+| Services Reserved | **5 nodes** | Karpenter + overprovisioning |
+| Workload Reserved | **5 nodes** | Karpenter + overprovisioning |
+| Management Reserved | **3 nodes** | Separate management cluster |
+| Waiting headroom | **≥ 1.5 × one worker** CPU+RAM | Preemptible overprovisioning |
 | Pod CIDR | `192.168.0.0/16` | `Cluster.spec.clusterNetwork` |
 | Region | kustomize param `AWS_REGION` | Per environment |
-| Node / bastion SSH | empty (`sshKeyName: ""`); bastion off | Prefer SSM on node role |
-| Public API CIDR | kustomize `PUBLIC_API_CIDR` | Lab allowlist (not `0.0.0.0/0`) |
-| CP logging | all five → CloudWatch | Explicit in CAPA YAML |
-| Secrets encryption | `alias/cluster-api-provider-aws-eks-secrets` | Deploy `aws_eks/kms` before create |
-| OIDC | `associateOIDCProvider: true` | IRSA-ready; Pod Identity later |
-| Cost tags | Project / Environment / CostCenter / … | CAPA `additionalTags` |
+| Node / bastion SSH | empty; bastion off | SSM only (WAF SEC) |
+| Public API CIDR | kustomize `PUBLIC_API_CIDR` | Tight allowlist; prefer private-only when mgmt in-VPC |
+| CP logging | all five → CloudWatch | Detection / audit (WAF SEC/OPS) |
+| Secrets encryption | CMK `alias/cluster-api-provider-aws-eks-secrets` | Encryption at rest (WAF SEC) |
+| OIDC | `associateOIDCProvider: true` | IRSA / Pod Identity foundation |
+| Cost tags | Project / Environment / CostCenter / … | Attribution (WAF COST) |
 
 **AWS-managed:** EKS control-plane HA, control-plane patching, etcd.  
-**CAPA-managed:** VPC/subnets/NAT pattern (via CAPA defaults + AZ limit), worker EC2 lifecycle, cluster create/update/delete via controllers.
+**CAPA-managed:** VPC/subnets/NAT (AZ limit), bootstrap worker lifecycle.  
+**Karpenter-managed:** Reserved Services/Workload pools + elastic headroom/burst.
 
-**Pinned in YAML (substrate hardens):** endpoint access, control-plane logging, secrets encryption CMK alias, OIDC association, tags, no SSH.  
-**Still open:** add-ons as CAPA objects, IRSA per service, management host, Services plane manifests.
+**Pinned in YAML:** endpoint access, logging, CMK encryption, OIDC, tags, no SSH, capacity model.  
+**Open for production completeness:** dedicated Karpenter node role/IRSA, management host choice, Argo + peer Services, Velero drills, detection stack, CI policy gates, VPC endpoints.
 
 ---
 
@@ -184,7 +213,7 @@ Shared **platform services** that run on the EKS workload cluster. They are not 
 
 **CI/CD is a Services-plane capability** (not a separate plane): Argo CD Principal and Agent live here with the other platform services.
 
-**Status:** architecture target (capabilities defined here). **Karpenter** manifests live under [`aws_eks/services/karpenter/`](aws_eks/services/karpenter/) (not Flux-wired). Other services still design-only.
+**Status:** **production design.** **Karpenter** capacity is specified in-repo under [`aws_eks/services/karpenter/`](aws_eks/services/karpenter/). Remaining Services (Argo CD, secrets, IdP, Harbor, CNPG, obs, Velero) are **next implementation slices** toward the WAF target — not optional lab extras.
 
 ### Capacity model (Reserved + headroom)
 
@@ -295,47 +324,49 @@ Add more rows here and on the SVG as the platform grows.
 | Apply path for apps / peer services | **Argo CD** |
 | On Prem / AWS Services | Vertical side surfaces — not planes; inventory grows over time |
 | Isolation | Dedicated namespaces per capability (and later network policies) |
-| Lab sizing | Single EKS holds workload + services; capacity model 5+5 Reserved + headroom (costly if fully applied); production may multi-cluster later |
+| Topology | Single EKS hosts Services + Workload planes initially; multi-cluster later if blast-radius requires it |
+| Capacity | **3** mgmt Reserved + **5** services Reserved + **5** workload Reserved + **1.5×** worker headroom — production floor |
 
-### Lab vs production (services)
+### Services plane production bar
 
-| Capability | Lab target | Production target |
-|------------|------------|-------------------|
-| Argo CD Principal + Agent (CI/CD) | Principal on Services; Agent on Workload + Services | HA Principal, agents per cluster, SSO, AppProjects |
-| Karpenter | Services plane; NodePools + reserved 5/5 + 1.5× headroom ([manifests](aws_eks/services/karpenter/)) | Disruption budgets, multi-AZ, cost consolidation, dedicated IRSA/node role |
-| Knative | Serving on Workload (lab scale) | Production quotas, eventing scope, multi-tenant limits |
-| Velero | Workload + Services; backup to S3 | Scheduled backups, immutability, restore runbooks, multi-cluster |
-| OpenBao | Single-node / lab HA mode | HA, auto-unseal, audit, policies, namespaces |
-| External Secrets Operator | Cluster-wide operator + ClusterSecretStore → OpenBao | Multi-store (OpenBao + AWS SM), refresh policies, least privilege |
-| CloudNativePG | Single small Postgres; backup optional | Multi-AZ, PITR, encryption, quotas |
-| Harbor | Single replica / lab storage | HA, signing/policies, pull-through |
-| OAuth2 Proxy | Protect Grafana / Harbor / Argo / Keycloak | Consistent edge auth for internal tools |
-| Keycloak | Single realm, lab IdP | HA, external DB (often CNPG), org IdP federation |
-| OpenTelemetry | Small collector footprint | Sampling, multi-tenant attributes, limits |
-| LGTM | Small footprints | HA backends, retention, auth via proxy + Keycloak |
+| Capability | Production design bar |
+|------------|----------------------|
+| Argo CD Principal + Agent (CI/CD) | HA Principal, agents on Workload + Services, SSO, AppProjects, RBAC |
+| Karpenter | Services plane; **5+5 Reserved** + **1.5× headroom**; multi-AZ; IRSA + dedicated node role; disruption budgets |
+| Knative | Workload plane; quotas, multi-tenant limits, measured eventing scope |
+| Velero | Workload + Services; scheduled backups to S3, immutability, **restore runbooks + drills** |
+| OpenBao | HA, auto-unseal, audit, policies, namespaces |
+| External Secrets Operator | Least privilege; OpenBao (+ AWS SM if hybrid); refresh policies |
+| CloudNativePG | Multi-AZ, PITR, encryption, quotas |
+| Harbor | HA, signing/policies, pull-through |
+| OAuth2 Proxy | Consistent edge auth for operator UIs |
+| Keycloak | HA, external DB (often CNPG), org IdP federation (AD/LDAP) |
+| OpenTelemetry | Sampling, tenancy attributes, limits |
+| LGTM | HA backends, retention, auth via proxy + Keycloak |
 
 ---
 
-## 8. Lab vs production targets (EKS substrate)
+## 8. Production substrate checklist (EKS)
 
-**Lab is intentional; production is the promotion target.**
+**Source of truth is the production column.** Historical lab values are provenance only.
 
-| Dimension | Lab (this repo today) | Production target |
-|-----------|----------------------|-------------------|
-| Management plane | **TBD** (empty) | Chosen host + HA, backups, restricted API |
-| Cluster lifecycle | CAPA → EKS (`aws_eks/`) | Same + policy gates, promotion envs |
-| Services / app CD | Argo CD in **Services plane** (target) | HA Principal + agents, SSO, AppProjects |
-| VPC / NAT | 2 AZs / 2 NATs | 3 AZs; consider VPC endpoints to cut NAT |
-| Workers | CAPA bootstrap 1 × `t3.large`; Karpenter targets **5 Reserved services + 5 Reserved workload + 1.5× headroom** | Same model; multi-AZ; dedicated Karpenter node role |
-| EKS API access | Private + public with `PUBLIC_API_CIDR` allowlist | Private-only when mgmt is in-VPC / VPN |
-| Control-plane logs | All five explicit → CloudWatch | Same + retention / SIEM |
-| Secrets encryption | CMK alias in YAML (`aws_eks/kms`) | Same; key policy reviews |
-| Node access | No SSH key; SSM policy on node role | SSM only; no bastion |
-| Pod identity | OIDC associated; IRSA per service not yet | IRSA or EKS Pod Identity per service |
-| Observability | Services plane target (OTel + LGTM); CP logs on | Same stack, production HA/retention |
-| IAM controllers | CAPA-wide policies | Tag/condition scope + access reviews |
-| Cost | 2-AZ floor + CAPA tags; `aws_cost/` budget template | Deploy budget; teardown automation |
-| DR | None | Multi-region strategy only if business requires |
+| Dimension | Production design (target in-repo) | Status |
+|-----------|-----------------------------------|--------|
+| Management plane | Chosen host + **3 Reserved** nodes, backups, restricted API | Host **TBD**; capacity target set |
+| Cluster lifecycle | CAPA → EKS + policy gates + promotion envs | CAPA YAML present; gates open |
+| Services / app CD | Argo CD HA on Services plane | Design; manifests next |
+| VPC / AZ | **3 AZs**; VPC endpoints vs NAT as cost/security tradeoff | YAML → 3 AZ |
+| Bootstrap workers | ≥2 multi-AZ system nodes | YAML → 2 |
+| App/platform capacity | Karpenter **5 Reserved services + 5 Reserved workload + 1.5× headroom** | Manifests in `services/karpenter` |
+| EKS API access | Private preferred; public only with tight CIDR until mgmt in-VPC | Explicit in YAML |
+| Control-plane logs | All five → CloudWatch + retention / SIEM path | YAML on; SIEM open |
+| Secrets encryption | CMK (`aws_eks/kms`) | YAML + template |
+| Node access | SSM only; no bastion / no standing SSH | YAML + IAM policy |
+| Pod identity | IRSA or EKS Pod Identity **per service** | OIDC on; per-service open |
+| Observability | OTel + LGTM production HA/retention; CP logs on | Design |
+| IAM controllers | Tag/condition scope + access reviews | CAPA-wide today; tighten later |
+| Cost | Tags + budgets; consolidation on elastic only | Tags + `aws_cost/` template |
+| DR | Backup/restore first; multi-region only if required | Velero design |
 
 ---
 
@@ -357,16 +388,15 @@ Add more rows here and on the SVG as the platform grows.
 
 ## 10. Design principles
 
-1. **EKS is the product path** — architecture optimizes for CAPA → EKS.  
-2. **Services plane is first-class** — shared capabilities (incl. CI/CD) are named and owned.  
-3. **Management cluster is TBD** — do not invent a dual GitOps story until that host is chosen.  
-4. **YAML first** — AWS and platform changes come from git.  
-5. **CI/CD is on the Services plane** — Argo CD Principal + Agent on EKS, not a separate plane.  
-6. **IAM is central for CAPA** — `aws_iam/` only; pod/service identity is separate.  
-7. **Cost-aware lab defaults** — 2 AZ / 2 NAT called out next to the knobs.  
+1. **Production WAF first** — design and score against high maturity (§1.1); lab work is foundation, not the goal.  
+2. **EKS is the product path** — CAPA → EKS; `aws_ec2` mirrors later.  
+3. **Services plane is first-class** — including CI/CD and Karpenter.  
+4. **Reserved capacity is intentional** — 3 / 5 / 5 + 1.5× headroom is the production floor, not waste to eliminate casually.  
+5. **Management host TBD, capacity not** — 3 Reserved nodes; do not treat experimental Kind path as the product.  
+6. **YAML first** — AWS and platform changes come from git.  
+7. **IAM is central for CAPA** — `aws_iam/` only; per-service IRSA/Pod Identity is mandatory for production Services.  
 8. **No secrets in git**.  
-9. **Document lab vs prod** — §7 (services) and §8 (substrate).  
-10. **`aws_ec2` follows later** — not dual primary architectures.
+9. **Measure and gate** — CI validation, budgets, restore drills, pillar re-score after major slices.
 
 ---
 
@@ -384,18 +414,18 @@ Add more rows here and on the SVG as the platform grows.
 
 ## 12. Evolution
 
-Prefer order:
+**Phase complete:** lab CAPA/EKS foundation (IAM, scaffold, hardens, experimental Flux).  
 
-1. Work **[platform-candidates.md](docs/platform-candidates.md)** — disposition candidates before drawing new boxes  
-2. Decide **management plane** (host + how CAPA is run) — keep the box empty until then  
-3. Harden EKS substrate (endpoint, logging, encryption, worker capacity for services)  
-   - **Done (YAML, 2026-07-20):** endpoint allowlist, CP logging, secrets CMK alias, OIDC, tags, no SSH / SSM policy on node role  
-   - **Open:** worker capacity for services, deploy CMK/budget when leaving pure-dev, private-only API when mgmt in-VPC  
-4. Land **Services plane**, starting with **CI/CD** (Argo CD Principal + Agent on EKS)  
-   - **Partial:** Karpenter capacity model + NodePools in `aws_eks/services/karpenter/` (not Flux-applied)  
-5. Land peer services via Argo (secrets, IdP, Harbor, CNPG, OTel, LGTM, …)  
-6. CI validation of CAPA + services manifests; CI → Harbor image flow  
-7. IRSA / Pod Identity for each service (OIDC already associated on CAPA EKS)  
-8. Then: reshape `aws_ec2/` as a clone of this operating model  
+**Current phase:** production design for **high WAF score**. Prefer order:
+
+1. Lock production substrate (3 AZ, bootstrap HA, CMK, endpoint, tags) — **in progress in YAML**  
+2. Decide **management plane host** (capacity already **3 Reserved**)  
+3. **Karpenter** production path — NodePools + Reserved 5/5 + 1.5× headroom (**manifests present**; controller IRSA + discovery tags next)  
+4. **Argo CD** Principal + Agent (Services) — unlocks the rest of the plane  
+5. Peer services via Argo: secrets (OpenBao+ESO), IdP, Harbor, CNPG, Velero, OTel+LGTM  
+6. IRSA / Pod Identity **per service**; tighten CAPA IAM with conditions  
+7. CI gates (schema, policy, WAF guardrails); budgets; backup **restore drills**  
+8. Full `/wa-review` re-score → close Critical/High until §1.1 targets met  
+9. Then: reshape `aws_ec2/` as a clone of this production operating model  
 
 Update this file, [docs/architecture.svg](docs/architecture.svg), and [docs/platform-candidates.md](docs/platform-candidates.md) when topology or dispositions change.

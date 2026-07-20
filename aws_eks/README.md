@@ -12,7 +12,8 @@ Declarative CAPA manifests for **EKS managed control plane** (+ EC2 workers in c
 | CAPA owns AWS lifecycle | Controllers reconcile CAPA CRs → EKS / VPC / workers |
 | Management host | **TBD** (not fixed in architecture) |
 | No secrets in git | Placeholders / local-only config |
-| Dev vs AWS | Keep Flux `resources: []` until ready; **git push enables AWS** via Flux |
+| Production WAF | Substrate + Services design toward ARCHITECTURE §1.1 targets |
+| Apply safety | Keep Flux `resources: []` until intentional promotion (experimental Flux can create AWS) |
 
 ## IAM
 

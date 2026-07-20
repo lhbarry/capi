@@ -1,21 +1,21 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
-  Monthly cost budget + optional email alarms for SCKE CAPA lab.
-  DEV: template only until you choose to deploy; not applied by Flux.
+  Monthly cost budget + optional email alarms for SCKE production platform.
+  Template only until deployed; not applied by Flux.
 
 Parameters:
   MonthlyBudgetAmount:
     Type: Number
-    Default: 50
+    Default: 500
     MinValue: 1
-    Description: Monthly USD budget for the lab account.
+    Description: Monthly USD budget (tune to Reserved 3/5/5 + bootstrap + headroom floor).
   AlertEmail:
     Type: String
     Default: ""
     Description: Optional email for budget notifications. Empty = budget only, no subscribers.
   BudgetName:
     Type: String
-    Default: scke-lab-monthly
+    Default: scke-production-monthly
 
 Conditions:
   HasAlertEmail: !Not [!Equals [!Ref AlertEmail, ""]]

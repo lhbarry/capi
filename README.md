@@ -2,32 +2,32 @@
 
 Arch. adaptation from On-Prem to AWS Cloud Services Hosting — **Cluster API + CAPA** → **Amazon EKS**, with a **Services plane** on that cluster.
 
-**Docs:** [ARCHITECTURE.md](ARCHITECTURE.md) · [docs/platform-candidates.md](docs/platform-candidates.md) (pin AWS / elect OSS / eliminate) · [docs/architecture.svg](docs/architecture.svg) (full size)
+**Phase:** **Production design** for a **high AWS Well-Architected (WAF) score**, built on a **completed lab foundation** (IAM, EKS scaffold, substrate hardens).
+
+**Docs:** [ARCHITECTURE.md](ARCHITECTURE.md) (§1.1 WAF targets) · [docs/platform-candidates.md](docs/platform-candidates.md) · [docs/architecture.svg](docs/architecture.svg)
 
 ## Architecture diagram
-
-Click the preview for the full SVG.
 
 <a href="docs/architecture.svg">
   <img src="docs/architecture.svg" alt="SCKE Transformative Architecture — click for full SVG" width="720" />
 </a>
 
-**Management cluster: TBD** — not fixed in the architecture (see [ARCHITECTURE.md](ARCHITECTURE.md)).
+**Management:** host product **TBD**; capacity target **3 nodes Reserved**. Do not treat experimental `clusters/capi-mgmt` as the production management plane.
 
-## Primary path: EKS + Services plane
+## Primary path: EKS + Services plane (production)
 
 | Path | Owns | Apply how |
 |------|------|-----------|
-| **`aws_eks/`** | EKS CAPA cluster YAML + optional KMS CFN; **Services plane** under `aws_eks/services/` (Karpenter first) | CAPA → AWS for clusters; services **not** Flux-wired yet; keep Flux `resources: []` in dev |
-| **`aws_iam/`** | CAPA IAM CloudFormation | `aws cloudformation deploy --template-file …` (only when applying) |
-| **`aws_cost/`** | Lab budget CFN (optional) | CLI deploy when ready — not Flux |
+| **`aws_eks/`** | CAPA EKS substrate + KMS; **Services** under `aws_eks/services/` | CAPA → AWS; Services via Argo (target) or explicit apply |
+| **`aws_iam/`** | CAPA IAM CloudFormation | `aws cloudformation deploy --template-file …` |
+| **`aws_cost/`** | Production budget guardrails | CLI deploy — not Flux |
 
-### Services plane (on EKS — architecture target)
+### Services plane
 
 | Industry capability | Team name | Stack |
 |---------------------|-----------|--------|
 | Continuous delivery (GitOps CD) | CI/CD | Argo CD **Principal** + **Agent** |
-| Node autoscaling | Compute | Karpenter — **5 Reserved** services + **5 Reserved** workload + **1.5× worker** headroom; mgmt **3 Reserved** (separate). Manifests: [`aws_eks/services/karpenter/`](aws_eks/services/karpenter/) |
+| Node autoscaling | Compute | Karpenter — **5 Reserved** services + **5 Reserved** workload + **1.5× worker** headroom; mgmt **3 Reserved**. [`aws_eks/services/karpenter/`](aws_eks/services/karpenter/) |
 | Backup & restore (also Workload) | Resilience | Velero |
 | Secrets management | Secrets | OpenBao |
 | Secrets synchronization | Secrets | External Secrets Operator |
@@ -40,38 +40,37 @@ Click the preview for the full SVG.
 
 See [ARCHITECTURE.md §7](ARCHITECTURE.md#7-services-plane).
 
-**Workload plane (also on EKS):** CAPA substrate + **Argo CD Agent**, **Knative**, **Velero** (Velero also on Services).
+**Workload plane:** CAPA bootstrap + Karpenter reserved workload nodes + **Argo CD Agent**, **Knative**, **Velero**.
 
-## IAM (one place only)
+## IAM
 
-All CAPA IAM lives under **`aws_iam/`** — not under `aws_eks/`.
+All CAPA IAM under **`aws_iam/`** only.
 
 | Stack | Template | Use for EKS |
 |-------|----------|-------------|
 | `capa-iam-common` | `aws_iam/common.yaml` | Always |
 | `capa-iam-eks` | `aws_iam/eks.yaml` | EKS control plane + controller policy |
-| `capa-iam-ec2` | `aws_iam/ec2-self-managed.yaml` | Node instance profile (current worker flavor) |
-
-See [`aws_iam/README.md`](aws_iam/README.md).
+| `capa-iam-ec2` | `aws_iam/ec2-self-managed.yaml` | Node profile (+ SSM) |
 
 ## Secondary: `aws_ec2/`
 
-Self-managed kubeadm path exists under [`aws_ec2/`](aws_ec2/) but is **not** the architecture focus. It will be reshaped as a **clone of the EKS operating model** later.
+Self-managed kubeadm path — **not** the production focus; later mirror of this EKS operating model.
 
 ## Other paths
 
 | Path | Owns |
 |------|------|
-| **`clusters/capi-mgmt/`** | Lab / experimental management material — **not** the architectural management plane |
-| **`local/`** | Process notes, secrets (gitignored) — never commit |
+| **`clusters/capi-mgmt/`** | Historical / experimental mgmt — **not** production management |
+| **`local/`** | Notes, secrets (gitignored) |
 | **`.planning/handoffs/`** | Session handoffs |
-| **`graphify-out/`** | Knowledge graph artifacts (gitignored) |
+| **`graphify-out/`** | Knowledge graph (local only) |
 
 ## Rules
 
-1. **YAML first** for anything that creates/changes AWS.  
-2. CAPA reconciles to **AWS**; **Services plane** (incl. Argo CD CI/CD) runs on **EKS**.  
-3. **Management cluster is TBD** — do not treat experimental mgmt paths as the design.  
-4. No secrets in git.  
-5. EKS lab cost floor: **2 AZs / 2 NATs** (`availabilityZoneUsageLimit: 2` on the managed control plane VPC).  
-6. **Dev mode:** do not enable Flux cluster resources or `git push` until you intend AWS creates.
+1. **YAML first** for AWS and platform changes.  
+2. CAPA → **AWS**; Services plane (incl. Argo CD, Karpenter) on **EKS**.  
+3. **Production WAF targets** in ARCHITECTURE §1.1 — design to those scores.  
+4. **Reserved capacity is intentional** (3 / 5 / 5 + 1.5× headroom).  
+5. No secrets in git.  
+6. Substrate production floor: **3 AZs**, bootstrap **≥2**, hardens on (logging, CMK, OIDC, SSM).  
+7. Experimental Flux on Kind is not the production CD story; do not enable cluster resources until an intentional environment promotion.
