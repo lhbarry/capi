@@ -1,12 +1,17 @@
 # ApplicationController (Services cluster)
 
-Argo CD **application-controller** on the **Services** cluster.
+Argo CD **application-controller** on the **Services** cluster (with Principal).
+
+## Why ApplicationController (not ApplicationSetController)
+
+Platform rule: the Principal install uses **ApplicationController** for Services apps. **ApplicationSetController is disabled** on Principal. Services desired state is expressed as **Application** CRs (including root/app-of-apps **Application** objects if needed), not ApplicationSets on this hub.
 
 ## Responsibility
 
-- Reconcile **Application** / **ApplicationSet** resources that target the **Services** plane (platform components, Principal-adjacent apps).  
-- Co-located with Principal (same Argo CD install / same API).  
-- Does **not** replace the Workload **Agent** for workload-plane apply.
+- Reconcile **Application** CRs that target the **Services** plane.  
+- Co-located with Principal (same cluster; required).  
+- Does **not** replace the Workload **Agent**.  
+- Does **not** co-exist with an Agent on this cluster.
 
 ## Why separate values file
 

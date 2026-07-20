@@ -4,9 +4,15 @@
 
 | Install | Cluster | Components |
 |---------|---------|------------|
-| **Principal** | **Services** | Argo CD control plane (API, UI, repo-server, redis) + agent **Principal** |
-| **ApplicationController** | **Services** | Argo CD application-controller for **Services-plane** Applications |
-| **Agent** | **Workload** | argocd-agent: local reconcile, **reports to Principal**, **independent** if Principal is down |
+| **Principal** | **Services only** | Control plane (API, UI, repo-server, redis) + agent hub Principal |
+| **ApplicationController** | **Services only** | Reconciles Services **Application** CRs (**not** ApplicationSetController) |
+| **Agent** | **Workload only** | Local reconcile; reports to Principal; **independent** if Principal is down |
+
+### Constraints
+
+1. **Principal and Agent must not co-locate** (same cluster) — unsupported by Argo CD for the foreseeable future.  
+2. Principal uses **ApplicationController**, **not** ApplicationSetController (`applicationSet.enabled: false`).  
+3. Services and Workload are **separate clusters** (required by #1).
 
 Full model: [architecture.md](architecture.md) · Pins: [VERSIONS.md](VERSIONS.md)
 

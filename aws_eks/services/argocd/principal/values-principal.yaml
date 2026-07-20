@@ -1,9 +1,12 @@
-# Argo CD Helm values — Principal (Services cluster)
+# Argo CD Helm values — Principal (Services cluster only)
 # Chart: argo/argo-cd (appVersion ~ v3.4.5). Merge with application-controller values.
+#
+# CONSTRAINTS:
+# - Do NOT install Workload Agent on this cluster (Principal+Agent co-location unsupported).
+# - ApplicationSetController OFF — Principal uses ApplicationController only.
 
 fullname: argocd
 
-# Services-plane placement (Karpenter Reserved services taint)
 global:
   domain: argocd.services.example.com
   nodeSelector:
@@ -14,31 +17,29 @@ global:
       value: services
       effect: NoSchedule
 
-# HA later: increase replicas / enable redis-ha
 server:
   replicas: 2
   service:
     type: ClusterIP
-  # UI exposed via OAuth2 Proxy / Ingress (not LoadBalancer public by default)
 
 repoServer:
   replicas: 2
 
 redis-ha:
   enabled: false
-  # enable for production HA when ready
+
+# ApplicationSetController: disabled (use ApplicationController for Services Applications)
+applicationSet:
+  enabled: false
+  # replicas: 0
 
 configs:
   cm:
-    # url: https://argocd.services.example.com
-    # exec.enabled: "false"
     timeout.reconciliation: 180s
   params:
-    # server.insecure: "true"  # only behind TLS-terminating proxy
     application.namespaces: "argocd"
 
-# Dex / OIDC → Keycloak later
-# configs.cm.oidc.config: |
+# ApplicationController: see ../application-controller/values-application-controller.yaml
 
-# Agent Principal (argocd-agent) is installed as a separate chart/manifests.
+# argocd-agent Principal (hub): separate install — not the Workload Agent.
 # See architecture.md and install.md.

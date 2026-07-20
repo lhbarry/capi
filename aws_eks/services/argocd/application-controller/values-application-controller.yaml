@@ -1,9 +1,8 @@
-# Overlay for application-controller on Services (merge with principal values)
+# Overlay: ApplicationController ON; ApplicationSetController OFF (see principal values).
 
 controller:
-  # Services ApplicationController — HA when ready
+  # Required on Principal/Services — not ApplicationSetController
   replicas: 1
-  # dynamicClusterDistribution / sharding: use when many Applications
   resources:
     requests:
       cpu: 250m
@@ -18,5 +17,8 @@ controller:
       value: services
       effect: NoSchedule
 
-# Workload Applications are NOT primarily reconciled here.
-# Workload uses the Agent on the Workload cluster (local controller path).
+# Explicit: ApplicationSet controller disabled (also set in principal values)
+applicationSet:
+  enabled: false
+
+# Workload Applications: Agent on Workload cluster only (never co-locate Agent here).

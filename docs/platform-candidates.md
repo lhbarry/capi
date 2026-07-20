@@ -141,7 +141,7 @@ Move candidates here with a date and reason. Reopen only with a new need stateme
 | 2026-07-20 | Management plane host | **SUSE Rancher / RKE2** | ADR-001; 3 Reserved; 4/16/100 gp3 |
 | 2026-07-20 | Management OS | **Ubuntu 24.04 LTS** | Canonical SSM AMI; not SLE Micro |
 | 2026-07-20 | Management pins | Rancher **2.14.3**, RKE2 **v1.34.9+rke2r1**, **m7i.xlarge** | management/VERSIONS.md + day-0 CFN |
-| 2026-07-20 | Argo CD topology | Principal + AppController on Services; Agent on Workload | Independent agent; aws_eks/services/argocd/ |
+| 2026-07-20 | Argo CD topology | Principal + **ApplicationController** on Services; Agent on Workload | No Principal+Agent co-location; **no ApplicationSetController** on Principal |
 
 ---
 

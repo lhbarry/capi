@@ -4,14 +4,16 @@
 
 ## 0. Prerequisites
 
-- Services API + Workload API (or dual node pools on one EKS)  
-- DNS/TLS for Argo UI (via OAuth2 Proxy + Keycloak later; bootstrap admin first)  
-- Git repo readable for Application sources  
-- Karpenter Reserved services/workload pools preferred  
+- **Two clusters:** Services EKS and Workload EKS (Agent cannot share Principal’s cluster)  
+- DNS/TLS for Argo UI (OAuth2 Proxy + Keycloak later; bootstrap admin first)  
+- Git readable for Application sources  
+- Karpenter / Reserved pools per plane  
 
-## 1. Services — Principal + ApplicationController
+## 1. Services — Principal + ApplicationController (no Agent)
 
-Single Helm release is typical: Argo CD chart with API, UI, repo-server, redis, **and** application-controller all on Services; agent Principal sidecar/components per argocd-agent docs.
+Single Helm release: API, UI, repo-server, redis, **application-controller**.  
+**Disable ApplicationSetController.**  
+**Do not** install Workload Agent here. Install **argocd-agent Principal** (hub) only.
 
 ```bash
 helm repo add argo https://argoproj.github.io/argo-helm

@@ -76,7 +76,7 @@ Same diagram as SVG: [docs/architecture.svg](docs/architecture.svg).
 | **Source of truth** | Plane | Git Repo | EKS CAPA YAML, IAM templates, docs; services manifests (target) |
 | **Management** | Plane | **SUSE Rancher / RKE2** (3 EC2, multi-AZ) | Rancher Manager + CAPI/CAPA; provisions downstream EKS |
 | **Identity bootstrap** | Plane | AWS IAM via CloudFormation | CAPA controllers + EKS CP role + node instance profile |
-| **Services** | Plane | On the EKS cluster (above Workload on diagram) | Platform services: **CI/CD** (Argo CD Principal + Agent), **Karpenter**, **Velero**, secrets, data, registry, identity, observability — see §7 |
+| **Services** | Plane / cluster | Services EKS | Platform: **Argo CD Principal + ApplicationController**, **Karpenter**, **Velero**, secrets, data, registry, identity, observability — see §7 |
 | **Workload** | Plane | AWS EKS (bottom of diagram) | Network, managed CP, CAPA workers, **Argo CD Agent**, **Knative**, **Velero** |
 | **On Prem Services** | Side surface (not a plane) | Left margin | **AD / LDAP**, **SMTP**, **MS Teams** — more TBD |
 | **AWS Services** | Side surface (not a plane) | Right margin | **EFS CSI (RWX)**, **EBS CSI (HP block)**, **S3** — more TBD |
@@ -101,7 +101,7 @@ Same diagram as SVG: [docs/architecture.svg](docs/architecture.svg).
 | Management cluster | **SUSE Rancher** on **RKE2**, 3 Reserved nodes ([ADR-001](docs/adr/001-management-cluster-rancher.md)) |
 | Workload / Services cluster shape | CAPA → Amazon EKS + bootstrap + Karpenter (`aws_eks/`) |
 | IAM for CAPA | CloudFormation in `aws_iam/` |
-| Services + app CD | Argo CD Principal + Agent **on the Services plane (EKS)** |
+| Services + app CD | Argo CD **Principal + ApplicationController** on Services; **Agent** on Workload (separate clusters) |
 
 IAM is deployed with the AWS CLI from templates in git (YAML-first, not console-first).
 
@@ -211,7 +211,7 @@ Karpenter (Services plane)                  # Reserved 5 services + 5 workload +
 
 Shared **platform services** that run on the EKS workload cluster. They are not CAPA cluster objects; they are the capabilities product teams and operators consume.
 
-**CI/CD is a Services-plane capability** (not a separate plane): Argo CD Principal and Agent live here with the other platform services.
+**CI/CD** spans Services and Workload: **Principal + ApplicationController** on Services; **Agent** only on Workload (no co-location).
 
 **Status:** **production design.** **Karpenter** capacity is specified in-repo under [`aws_eks/services/karpenter/`](aws_eks/services/karpenter/). Remaining Services (Argo CD, secrets, IdP, Harbor, CNPG, obs, Velero) are **next implementation slices** toward the WAF target — not optional lab extras.
 
@@ -232,7 +232,7 @@ Industry names are primary; **team names** in parentheses for local vocabulary.
 
 | Capability (industry) | Team name | Product / stack | Role |
 |-----------------------|-----------|-----------------|------|
-| **Continuous delivery** (GitOps CD) | CI/CD | [Argo CD](https://argo-cd.readthedocs.io/) **Principal** + **Agent** | Deploy/reconcile services & apps from git |
+| **Continuous delivery** (GitOps CD) | CI/CD | [Argo CD](https://argo-cd.readthedocs.io/) Principal + **ApplicationController** (Services); **Agent** (Workload) | Services apps via ApplicationController; Workload via independent Agent |
 | **Node autoscaling** (just-in-time compute) | Compute | [Karpenter](https://karpenter.sh/) | Provisions/right-sizes EC2 nodes for pending pods; consolidates waste |
 | **Serverless / event-driven runtime** | Runtime | [Knative](https://knative.dev/) | Scale-to-zero, eventing/serving on the workload cluster |
 | **Backup & restore** | Resilience | [Velero](https://velero.io/) | Cluster/namespace backup & restore (often to S3); on **Workload + Services** |
@@ -252,9 +252,10 @@ Industry language: **GitOps continuous delivery**. Team name: **CI/CD**.
 
 | Component | Placement | Responsibility |
 |-----------|-----------|----------------|
-| **Principal** | **Services cluster** | Hub control plane: UI/API, git, RBAC, agent Principal; single pane of glass |
-| **ApplicationController** | **Services cluster** | Reconciles **Services-plane** Applications (local to Services) |
-| **Agent** | **Workload cluster** | Local reconcile of **Workload** apps; **reports** to Principal; **operates independently** if Principal is down |
+| **Principal** | **Services cluster only** | Hub: UI/API, git, RBAC, agent hub; **never** co-located with Agent |
+| **ApplicationController** | **Services cluster only** | Reconciles Services **Application** CRs (**not** ApplicationSetController) |
+| **ApplicationSetController** | **Not used** on Principal | Disabled — Principal uses ApplicationController |
+| **Agent** | **Workload cluster only** | Local reconcile; reports to Principal; independent if Principal is down; **not** on Services |
 
 ```text
   Services cluster:  Principal + ApplicationController · Karpenter · platform peers
@@ -264,8 +265,9 @@ Industry language: **GitOps continuous delivery**. Team name: **CI/CD**.
 | Concern | Choice |
 |---------|--------|
 | EKS cluster lifecycle | CAPA from **Rancher/RKE2 management** ([ADR-001](docs/adr/001-management-cluster-rancher.md)) |
-| Principal + ApplicationController | **Services only** |
-| Agent | **Workload only** (independent operation + status report) |
+| Principal + ApplicationController | **Services only** (no Agent on this cluster) |
+| ApplicationSetController | **Off** on Principal |
+| Agent | **Workload only** (cannot co-locate with Principal; independent + report) |
 | Karpenter | **Services plane** (cluster compute for EKS node pools) |
 | Knative | **Workload plane** |
 | Velero | Workload + Services |
@@ -326,7 +328,8 @@ Add more rows here and on the SVG as the platform grows.
 
 | Decision | Choice |
 |----------|--------|
-| Services plane host | **On EKS**, including Argo CD Principal (+ Agent), **Karpenter**, Velero |
+| Services cluster | EKS with Argo CD Principal + ApplicationController, **Karpenter**, platform peers |
+| Workload cluster | Separate EKS with Argo CD **Agent** (no Principal), Knative, apps |
 | Workload plane | EKS substrate **including Argo CD Agent, Knative, Velero** |
 | Apply path for apps / peer services | **Argo CD** |
 | On Prem / AWS Services | Vertical side surfaces — not planes; inventory grows over time |
@@ -384,7 +387,7 @@ Add more rows here and on the SVG as the platform grows.
 | **Git → CAPA desired state** | Cluster specs in `aws_eks/`; how they are applied depends on future management choice |
 | **CAPA → AWS** | Controllers use CAPA IAM; create EKS, VPC, EC2, … |
 | **EKS workload API** | Services plane + apps run here — not on an undecided management host |
-| **Services plane CI/CD** | Argo CD Principal + Agent on EKS; limit who can change Application specs in git/hub |
+| **Services plane CI/CD** | Argo CD Principal + ApplicationController; Agent only on Workload; limit who can change Application specs in git/hub |
 | **Identity (services)** | Keycloak is the cluster IdP; OAuth2 Proxy is the enforcement edge for UIs (including Argo CD) |
 | **Secrets** | OpenBao is the system of record; External Secrets is the only path that should mint long-lived K8s Secrets from it |
 | **Data / registry** | CNPG and Harbor hold sensitive state — network policy + secrets discipline |

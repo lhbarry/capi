@@ -5,18 +5,21 @@ Hub control plane for GitOps.
 ## Includes
 
 - Argo CD API server, UI (server), repo-server, redis  
-- ApplicationSet controller (optional, enable when needed)  
+- **ApplicationController** (via [../application-controller](../application-controller/) values) — **required**  
 - **argocd-agent Principal** (hub side for Workload agents)  
 
-## Does not include
+## Explicitly excluded on this cluster
 
-- Workload-local apply (that is the **Agent** on Workload)  
-- Full ApplicationController tuning — see sibling [../application-controller](../application-controller/) values overlay  
+| Component | Why |
+|-----------|-----|
+| **Agent** | Argo CD does **not** support Principal co-located with Agent (foreseeable future) |
+| **ApplicationSetController** | Principal uses **ApplicationController** only; ApplicationSetController is **off** |
 
 ## Placement
 
 - Namespace: `argocd` (or `argocd-principal`)  
 - Nodes: Services Reserved (`capacity.scke.io/plane=services`)  
+- **Cluster:** Services EKS only (not Workload)  
 
 ## Values
 
