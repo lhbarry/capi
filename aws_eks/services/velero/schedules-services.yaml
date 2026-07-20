@@ -1,0 +1,38 @@
+# Services cluster — daily config + weekly with volumes
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: daily-services
+  namespace: velero
+  labels:
+    capacity.scke.io/plane: services
+spec:
+  schedule: "0 1 * * *"
+  template:
+    includedNamespaces:
+      - argocd
+      - platform
+      - cattle-system
+    # add platform ns as they land
+    ttl: 168h0m0s  # 7 days
+    snapshotVolumes: false
+    storageLocation: default
+---
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: weekly-services-volumes
+  namespace: velero
+  labels:
+    capacity.scke.io/plane: services
+spec:
+  schedule: "0 3 * * 0"
+  template:
+    includedNamespaces:
+      - argocd
+      - platform
+    ttl: 720h0m0s  # 30 days
+    snapshotVolumes: true
+    storageLocation: default
+    volumeSnapshotLocations:
+      - default

@@ -1,0 +1,109 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  CloudWatch alarms for SCKE reliability. Requires SNS topic and
+  (for EKS node metrics) Container Insights enabled on clusters.
+  Not Flux-applied.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: scke
+  AlarmTopicArn:
+    Type: String
+    Description: SNS topic ARN for alarm notifications
+  ServicesClusterName:
+    Type: String
+    Default: capi-eks-services
+  WorkloadClusterName:
+    Type: String
+    Default: capi-eks-workload
+
+Resources:
+  ServicesFailedNodes:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${ProjectName}-${ServicesClusterName}-failed-nodes
+      AlarmDescription: Services cluster failed/NotReady node count (Container Insights)
+      Namespace: ContainerInsights
+      MetricName: cluster_failed_node_count
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ServicesClusterName
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmTopicArn
+      OKActions:
+        - !Ref AlarmTopicArn
+
+  WorkloadFailedNodes:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${ProjectName}-${WorkloadClusterName}-failed-nodes
+      AlarmDescription: Workload cluster failed/NotReady node count (Container Insights)
+      Namespace: ContainerInsights
+      MetricName: cluster_failed_node_count
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref WorkloadClusterName
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmTopicArn
+      OKActions:
+        - !Ref AlarmTopicArn
+
+  ServicesNodeCpuHigh:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${ProjectName}-${ServicesClusterName}-node-cpu-high
+      AlarmDescription: Average node CPU > 80% (Container Insights)
+      Namespace: ContainerInsights
+      MetricName: node_cpu_utilization
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ServicesClusterName
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 3
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmTopicArn
+
+  WorkloadNodeCpuHigh:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${ProjectName}-${WorkloadClusterName}-node-cpu-high
+      AlarmDescription: Average node CPU > 80% (Container Insights)
+      Namespace: ContainerInsights
+      MetricName: node_cpu_utilization
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref WorkloadClusterName
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 3
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmTopicArn
+
+  # CAPA / API path — EKS control plane logged errors via metric filter (optional follow-on)
+  # Add metric filters on /aws/eks/<cluster>/cluster log groups after clusters exist.
+
+Outputs:
+  ServicesFailedNodesAlarm:
+    Value: !Ref ServicesFailedNodes
+  WorkloadFailedNodesAlarm:
+    Value: !Ref WorkloadFailedNodes

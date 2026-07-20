@@ -1,0 +1,40 @@
+# Velero Helm values sketch — apply per cluster with IRSA
+
+configuration:
+  backupStorageLocation:
+    - name: default
+      provider: aws
+      bucket: scke-velero-backups   # replace
+      default: true
+      config:
+        region: us-east-2
+  volumeSnapshotLocation:
+    - name: default
+      provider: aws
+      config:
+        region: us-east-2
+  defaultBackupTTL: 720h0m0s  # 30 days
+
+initContainers:
+  - name: velero-plugin-for-aws
+    image: velero/velero-plugin-for-aws:v1.11.1
+    volumeMounts:
+      - mountPath: /target
+        name: plugins
+
+serviceAccount:
+  server:
+    create: true
+    name: velero
+    annotations: {}
+      # eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT:role/scke-velero
+
+credentials:
+  useSecret: false  # IRSA preferred
+
+deployNodeAgent: true  # restic/kopia for file-level if needed; prefer CSI snapshots
+
+# Workload cluster: nodeSelector for workload plane if taints used
+# nodeAgent:
+#   nodeSelector:
+#     capacity.scke.io/plane: workload

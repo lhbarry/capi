@@ -58,15 +58,15 @@ Score reflects **in-repo production design + evidence**, not fully deployed live
 | Pillar | Score | Critical | High | Notes |
 |--------|------:|---------:|-----:|-------|
 | Operational Excellence | **3.2** | 0 | 2 | Three-cluster order, Argo/Turtles path; CI gates incomplete |
-| **Security** | **4.1** | 0 | 1 | Private EKS API, CMK, encrypted volumes, CloudTrail/GuardDuty/Config, IRSA for Karpenter, PSS + NetworkPolicy, IR stub — see [docs/wa-scorecard.md](docs/wa-scorecard.md) |
-| Reliability | **3.0** | 0 | 2 | HA topology designed; Velero drills open |
+| **Security** | **4.1** | 0 | 1 | Private API, detection, IRSA, PSS/NP — [wa-scorecard](docs/wa-scorecard.md) |
+| **Reliability** | **4.1** | 0 | 1 | 3-cluster HA, Velero schedules+drill, alarms, PDBs, RTO/RPO, mgmt etcd snapshots — [reliability.md](docs/reliability.md) |
 | Performance Efficiency | **2.7** | 0 | 1 | Workload Karpenter; no metrics process |
 | Cost Optimization | **2.8** | 0 | 1 | Tags + budget template; undeployed |
 | Sustainability | **2.6** | 0 | 1 | Workload elasticity; Services static |
 
-**Overall (design): ~3.2 / 5** · **Security ≥ 4.0 achieved (design).**  
+**Overall (design): ~3.4 / 5** · **SEC ≥ 4.0** · **REL ≥ 4.0** (design).  
 
-**Path to overall ≥ 3.8:** live install order, Velero+restore, detection deployed, CI gates, ops metrics.
+**Path to overall ≥ 3.8:** live install, CI gates, cost/sustainability process, ops metrics.
 
 ---
 
@@ -427,8 +427,10 @@ Add more rows here and on the SVG as the platform grows.
 | [docs/clusters.md](docs/clusters.md) | Three-cluster map |
 | [docs/provisioning-order.md](docs/provisioning-order.md) | Apply order 1→2→3 |
 | [docs/wa-scorecard.md](docs/wa-scorecard.md) | WAF score to date |
+| [docs/reliability.md](docs/reliability.md) | RTO/RPO, failure modes, REL controls |
 | [management/](management/) | Management cluster |
 | [aws_eks/](aws_eks/) | Services + Workload CAPA + platform installs |
+| [aws_reliability/](aws_reliability/) | CloudWatch alarms, quotas |
 | [docs/platform-candidates.md](docs/platform-candidates.md) | Candidate backlog |
 
 ---

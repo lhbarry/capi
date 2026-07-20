@@ -42,8 +42,8 @@ CAPA applies only what is in git under `aws_eks/clusters/{services,workload}/` w
 | When | Action |
 |------|--------|
 | Before CAPA EKS | Deploy `aws_security/detection.yaml` + `aws_eks/kms` + CAPA IAM |
-| After **Services** Ready | Argo Principal + ApplicationController; `aws_eks/security` NetworkPolicies/PSS; platform peers (**no Karpenter**) |
-| After **Workload** Ready | `aws_iam/karpenter-irsa.yaml`; **Karpenter**; Argo **Agent**; PSS namespaces |
+| After **Services** Ready | Argo Principal + ApplicationController; security baselines; **Velero** + schedules; Argo PDBs; platform peers (**no Karpenter**) |
+| After **Workload** Ready | Karpenter IRSA + **Karpenter**; Argo **Agent**; **Velero** + schedules; PSS |
 
 Private EKS API only — Management network path required (VPC/peering/TGW).
 

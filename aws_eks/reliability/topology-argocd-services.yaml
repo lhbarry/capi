@@ -1,0 +1,23 @@
+# Topology spread guidance — patch into Argo Helm values or apply as strategic merge later.
+# Documented as a reference ConfigMap so install does not require live Argo CRDs.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scke-rel-topology-guidance
+  namespace: default
+  labels:
+    capacity.scke.io/plane: services
+data:
+  argocd-server: |
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: argocd-server
+  capa-services-md: |
+    Prefer multi-AZ MachineDeployment (CAPA AZ usage limit 3).
+    Services MD replicas: 5 across 3 AZs.
+  workload-karpenter: |
+    NodePool requirements include zone Exists; overprovisioning spreads via anti-affinity.

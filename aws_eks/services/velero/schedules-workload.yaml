@@ -1,0 +1,39 @@
+# Workload cluster — daily apps + weekly volumes
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: daily-workload
+  namespace: velero
+  labels:
+    capacity.scke.io/plane: workload
+spec:
+  schedule: "0 2 * * *"
+  template:
+    excludedNamespaces:
+      - kube-system
+      - kube-public
+      - kube-node-lease
+      - karpenter
+    ttl: 168h0m0s
+    snapshotVolumes: false
+    storageLocation: default
+---
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: weekly-workload-volumes
+  namespace: velero
+  labels:
+    capacity.scke.io/plane: workload
+spec:
+  schedule: "0 4 * * 0"
+  template:
+    excludedNamespaces:
+      - kube-system
+      - kube-public
+      - kube-node-lease
+    ttl: 720h0m0s
+    snapshotVolumes: true
+    storageLocation: default
+    volumeSnapshotLocations:
+      - default

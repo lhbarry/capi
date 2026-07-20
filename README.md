@@ -22,7 +22,7 @@ Arch. adaptation from On-Prem to AWS Cloud Services Hosting — **Cluster API + 
 | **2. Services EKS** | [`aws_eks/clusters/services/`](aws_eks/clusters/services/) | CAPA on Management |
 | **3. Workload EKS** | [`aws_eks/clusters/workload/`](aws_eks/clusters/workload/) | CAPA on Management |
 | Platform installs | [`aws_eks/services/`](aws_eks/services/) (Argo, Karpenter, …) | Onto Services and/or Workload |
-| IAM / cost / KMS / **security** | `aws_iam/`, `aws_cost/`, `aws_eks/kms/`, **`aws_security/`** | CLI CFN when promoting |
+| IAM / cost / KMS / security / **reliability** | `aws_iam/`, `aws_cost/`, `aws_eks/kms/`, `aws_security/`, **`aws_reliability/`** | CLI CFN when promoting |
 
 ### Services plane
 
