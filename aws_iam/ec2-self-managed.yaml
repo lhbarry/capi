@@ -31,6 +31,9 @@ Resources:
       ManagedPolicyArns:
       - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
       - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+      # SSM Session Manager — prefer over standing SSH for lab/prod node access.
+      # Not applied until this stack is redeployed (dev: template-only until you choose).
+      - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
       RoleName: nodes.cluster-api-provider-aws.sigs.k8s.io
     Type: AWS::IAM::Role
 

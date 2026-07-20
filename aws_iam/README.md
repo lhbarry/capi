@@ -32,8 +32,10 @@ Do not use `clusterawsadm bootstrap iam create-cloudformation-stack` as the sour
 |----------|--------|
 | Kind CAPA only | `common` |
 | `aws_ec2` | `common` + `ec2` |
-| `aws_eks` | `common` + `eks` |
+| `aws_eks` | `common` + `eks` + `ec2` (node instance profile; includes SSM) |
 | Both | all three |
+
+Node role includes `AmazonSSMManagedInstanceCore` so workers can use Session Manager instead of standing SSH. Redeploy `capa-iam-ec2` only when you intentionally update live IAM.
 
 ## Deploy
 

@@ -44,8 +44,8 @@ Prove and document **creating and managing EKS on AWS** with:
   │ MS Teams    │   Management TBD    Identity CFN         │ S3            │
   │             │         │                    │           │               │
   │             │         ▼                    ▼           │               │
-  │             │   Workload plane (EKS) …                 │               │
   │             │   Services plane (on EKS) …              │               │
+  │             │   Workload plane (EKS) …   ← bottom      │               │
   └─────────────┘                                          └───────────────┘
 ```
 
@@ -55,11 +55,11 @@ Same diagram as SVG: [docs/architecture.svg](docs/architecture.svg).
 
 | Layer | Kind | Where | What lives there |
 |-------|------|-------|------------------|
-| **Source of truth** | Plane | GitHub (this repo) | EKS CAPA YAML, IAM templates, docs; services manifests (target) |
+| **Source of truth** | Plane | Git Repo | EKS CAPA YAML, IAM templates, docs; services manifests (target) |
 | **Management** | Plane | **TBD** | Empty by design — CAPI/CAPA host not decided |
 | **Identity bootstrap** | Plane | AWS IAM via CloudFormation | CAPA controllers + EKS CP role + node instance profile |
-| **Workload** | Plane | AWS EKS | Network, managed CP, CAPA workers, **Argo CD Agent**, **Knative**, **Velero** |
-| **Services** | Plane | On the EKS cluster | Platform services: **CI/CD** (Argo CD Principal + Agent), **Velero**, secrets, data, registry, identity, observability — see §7 |
+| **Services** | Plane | On the EKS cluster (above Workload on diagram) | Platform services: **CI/CD** (Argo CD Principal + Agent), **Karpenter**, **Velero**, secrets, data, registry, identity, observability — see §7 |
+| **Workload** | Plane | AWS EKS (bottom of diagram) | Network, managed CP, CAPA workers, **Argo CD Agent**, **Knative**, **Velero** |
 | **On Prem Services** | Side surface (not a plane) | Left margin | **AD / LDAP**, **SMTP**, **MS Teams** — more TBD |
 | **AWS Services** | Side surface (not a plane) | Right margin | **EFS CSI (RWX)**, **EBS CSI (HP block)**, **S3** — more TBD |
 
@@ -162,12 +162,19 @@ MachineDeployment (capi-eks-1-md-0)
 | Kubernetes version | `v1.34.1` | Pinned in CAPA + MD |
 | Instance type | `t3.large` | Lab default |
 | Pod CIDR | `192.168.0.0/16` | `Cluster.spec.clusterNetwork` |
-| Region / SSH | placeholders / params | Per environment; not committed secrets |
+| Region | kustomize param `AWS_REGION` | Per environment |
+| Node / bastion SSH | empty (`sshKeyName: ""`); bastion off | Prefer SSM on node role |
+| Public API CIDR | kustomize `PUBLIC_API_CIDR` | Lab allowlist (not `0.0.0.0/0`) |
+| CP logging | all five → CloudWatch | Explicit in CAPA YAML |
+| Secrets encryption | `alias/cluster-api-provider-aws-eks-secrets` | Deploy `aws_eks/kms` before create |
+| OIDC | `associateOIDCProvider: true` | IRSA-ready; Pod Identity later |
+| Cost tags | Project / Environment / CostCenter / … | CAPA `additionalTags` |
 
 **AWS-managed:** EKS control-plane HA, control-plane patching, etcd.  
 **CAPA-managed:** VPC/subnets/NAT pattern (via CAPA defaults + AZ limit), worker EC2 lifecycle, cluster create/update/delete via controllers.
 
-Fields not yet pinned in YAML (rely on CAPA/EKS defaults until we grow the design): API endpoint public/private, control-plane logging, secrets encryption KMS, add-ons as CAPA objects, IRSA/OIDC.
+**Pinned in YAML (substrate hardens):** endpoint access, control-plane logging, secrets encryption CMK alias, OIDC association, tags, no SSH.  
+**Still open:** add-ons as CAPA objects, IRSA per service, management host, Services plane manifests.
 
 ---
 
@@ -186,6 +193,7 @@ Industry names are primary; **team names** in parentheses for local vocabulary.
 | Capability (industry) | Team name | Product / stack | Role |
 |-----------------------|-----------|-----------------|------|
 | **Continuous delivery** (GitOps CD) | CI/CD | [Argo CD](https://argo-cd.readthedocs.io/) **Principal** + **Agent** | Deploy/reconcile services & apps from git |
+| **Node autoscaling** (just-in-time compute) | Compute | [Karpenter](https://karpenter.sh/) | Provisions/right-sizes EC2 nodes for pending pods; consolidates waste |
 | **Serverless / event-driven runtime** | Runtime | [Knative](https://knative.dev/) | Scale-to-zero, eventing/serving on the workload cluster |
 | **Backup & restore** | Resilience | [Velero](https://velero.io/) | Cluster/namespace backup & restore (often to S3); on **Workload + Services** |
 | **Database platform** (PostgreSQL on Kubernetes) | Data | [CloudNativePG](https://cloudnative-pg.io/) | Cloud-native Postgres operator: HA, backups, failover |
@@ -208,7 +216,7 @@ Industry language: **GitOps continuous delivery** with Principal (hub/control) +
 
 ```text
   Workload plane:  Network · EKS CP · Workers · Argo Agent · Knative · Velero
-  Services plane:  Argo Principal ◄──► Argo Agent · Velero · peers (IdP, Harbor, secrets, …)
+  Services plane:  Argo Principal ◄──► Argo Agent · Karpenter · Velero · peers (IdP, Harbor, secrets, …)
 ```
 
 | Concern | Choice |
@@ -216,6 +224,7 @@ Industry language: **GitOps continuous delivery** with Principal (hub/control) +
 | EKS cluster lifecycle | CAPA (management host **TBD**) |
 | Principal | Services plane only |
 | Agent | Workload plane **and** Services plane |
+| Karpenter | **Services plane** (cluster compute autoscaling for the EKS node pool) |
 | Knative | **Workload plane** (app runtime substrate) |
 | Velero | **Workload plane** *and* **Services plane** (backup platform + cluster data) |
 | Delivery of other services + applications | Argo CD (once present) |
@@ -231,7 +240,7 @@ Industry language: **GitOps continuous delivery** with Principal (hub/control) +
   Services plane:  Git ──► Argo Principal ◄──► Argo Agent ──► apps/svc
                               │
                               └── UI ◄── OAuth2 Proxy ◄── Keycloak
-                   Velero (also Workload) · OpenBao ◄── ESO ──► K8s Secrets
+                   Karpenter ──► EC2 nodes · Velero (also Workload) · OpenBao ◄── ESO
                    CI ──► Harbor · Apps ──► CNPG · OTel ──► LGTM
   Side surfaces:   On Prem (AD/LDAP · SMTP · MS Teams) · AWS (EFS CSI RWX · EBS CSI block · S3)
 ```
@@ -239,6 +248,7 @@ Industry language: **GitOps continuous delivery** with Principal (hub/control) +
 | Flow | Components |
 |------|------------|
 | Deploy services/apps | Git → Argo CD Principal → Agent (Workload + Services) on EKS |
+| Node capacity | **Karpenter** on Services plane provisions/right-sizes EC2 for pending pods |
 | Serverless / scale-to-zero | **Knative** on Workload plane |
 | Backup / restore | **Velero** on Workload + Services (snapshots / object storage, often **S3**) |
 | Login to operator UIs | Keycloak + OAuth2 Proxy (incl. Argo CD UI) |
@@ -269,7 +279,7 @@ Add more rows here and on the SVG as the platform grows.
 
 | Decision | Choice |
 |----------|--------|
-| Services plane host | **On EKS**, including Argo CD Principal (+ Agent) |
+| Services plane host | **On EKS**, including Argo CD Principal (+ Agent), **Karpenter**, Velero |
 | Workload plane | EKS substrate **including Argo CD Agent, Knative, Velero** |
 | Apply path for apps / peer services | **Argo CD** |
 | On Prem / AWS Services | Vertical side surfaces — not planes; inventory grows over time |
@@ -281,6 +291,7 @@ Add more rows here and on the SVG as the platform grows.
 | Capability | Lab target | Production target |
 |------------|------------|-------------------|
 | Argo CD Principal + Agent (CI/CD) | Principal on Services; Agent on Workload + Services | HA Principal, agents per cluster, SSO, AppProjects |
+| Karpenter | Services plane; NodePools / EC2NodeClass | Disruption budgets, multi-AZ, cost consolidation, IRSA |
 | Knative | Serving on Workload (lab scale) | Production quotas, eventing scope, multi-tenant limits |
 | Velero | Workload + Services; backup to S3 | Scheduled backups, immutability, restore runbooks, multi-cluster |
 | OpenBao | Single-node / lab HA mode | HA, auto-unseal, audit, policies, namespaces |
@@ -305,14 +316,14 @@ Add more rows here and on the SVG as the platform grows.
 | Services / app CD | Argo CD in **Services plane** (target) | HA Principal + agents, SSO, AppProjects |
 | VPC / NAT | 2 AZs / 2 NATs | 3 AZs; consider VPC endpoints to cut NAT |
 | Workers | 1 × `t3.large` | ≥2–3 multi-AZ (services plane needs headroom) |
-| EKS API access | CAPA defaults (not explicit in YAML) | Private endpoint preferred; public CIDR allowlist if needed |
-| Control-plane logs | Not explicit | API, audit, authenticator, controller, scheduler → CloudWatch |
-| Secrets encryption | Not explicit | Customer-managed KMS key |
-| Node access | SSH key placeholders / params | SSM only; no standing SSH |
-| Pod identity | Not first-class | IRSA or EKS Pod Identity (required cleanly for services) |
-| Observability | Services plane target (OTel + LGTM) | Same stack, production HA/retention |
+| EKS API access | Private + public with `PUBLIC_API_CIDR` allowlist | Private-only when mgmt is in-VPC / VPN |
+| Control-plane logs | All five explicit → CloudWatch | Same + retention / SIEM |
+| Secrets encryption | CMK alias in YAML (`aws_eks/kms`) | Same; key policy reviews |
+| Node access | No SSH key; SSM policy on node role | SSM only; no bastion |
+| Pod identity | OIDC associated; IRSA per service not yet | IRSA or EKS Pod Identity per service |
+| Observability | Services plane target (OTel + LGTM); CP logs on | Same stack, production HA/retention |
 | IAM controllers | CAPA-wide policies | Tag/condition scope + access reviews |
-| Cost | Documented 2-AZ floor | Budgets, tags, teardown automation |
+| Cost | 2-AZ floor + CAPA tags; `aws_cost/` budget template | Deploy budget; teardown automation |
 | DR | None | Multi-region strategy only if business requires |
 
 ---

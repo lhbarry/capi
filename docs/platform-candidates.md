@@ -45,7 +45,7 @@ These are **on the architecture** today. Change them via architecture review, no
 | **AWS Services** | EFS + CSI (RWX), EBS + CSI (HP block), S3 |
 | **On Prem Services** | AD / LDAP, SMTP, MS Teams |
 | **Workload plane** | CAPA EKS substrate, **Argo CD Agent**, **Knative**, **Velero** |
-| **Services plane** | Argo CD Principal/Agent, **Velero**, Keycloak, OAuth2 Proxy, Harbor, OpenBao, External Secrets Operator, CloudNativePG, OpenTelemetry, Grafana LGTM |
+| **Services plane** | Argo CD Principal/Agent, **Karpenter**, **Velero**, Keycloak, OAuth2 Proxy, Harbor, OpenBao, External Secrets Operator, CloudNativePG, OpenTelemetry, Grafana LGTM |
 
 ---
 
@@ -132,6 +132,7 @@ Move candidates here with a date and reason. Reopen only with a new need stateme
 | 2026-07-17 | OpenBao, External Secrets | elected-oss | Services plane secrets path |
 | 2026-07-17 | Knative | elected-oss | Workload plane serverless runtime |
 | 2026-07-17 | Velero | elected-oss | Workload + Services; often S3 target |
+| 2026-07-17 | Karpenter | elected-oss | Services plane node autoscaling |
 | 2026-07-17 | Argo CD, Keycloak, OAuth2 Proxy, Harbor, CNPG, OTel, LGTM | elected-oss | Services plane (see ARCHITECTURE) |
 
 ---

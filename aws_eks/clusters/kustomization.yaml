@@ -1,6 +1,8 @@
 # Flux path ./aws_eks/clusters
 # Parameterize via configMapGenerator + replacements (edit literals before enabling resources).
-# GitOps: push only after setting YOUR_* values; empty resources = teardown/prune.
+#
+# DEV SAFETY: keep resources: [] until ready to create AWS. Enabling + git push
+# causes Flux → CAPA → EKS (cost + cloud changes). Do not push from this mode.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -14,7 +16,9 @@ configMapGenerator:
     literals:
       # Set these for your environment before enabling resources and pushing.
       - AWS_REGION=us-east-2
-      - AWS_SSH_KEY_NAME=YOUR_EC2_KEY_PAIR_NAME
+      # Your public IP/32 (or office egress) for EKS public API allowlist.
+      # Never leave as 0.0.0.0/0 in shared accounts.
+      - PUBLIC_API_CIDR=YOUR_PUBLIC_IP/32
     options:
       disableNameSuffixHash: true
       labels:
@@ -33,13 +37,9 @@ replacements:
   - source:
       kind: ConfigMap
       name: capa-eks-cluster-params
-      fieldPath: data.AWS_SSH_KEY_NAME
+      fieldPath: data.PUBLIC_API_CIDR
     targets:
       - select:
           kind: AWSManagedControlPlane
         fieldPaths:
-          - spec.sshKeyName
-      - select:
-          kind: AWSMachineTemplate
-        fieldPaths:
-          - spec.template.spec.sshKeyName
+          - spec.endpointAccess.publicCIDRs.0

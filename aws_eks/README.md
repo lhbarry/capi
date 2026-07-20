@@ -12,17 +12,19 @@ Declarative CAPA manifests for **EKS managed control plane** (+ EC2 workers in c
 | CAPA owns AWS lifecycle | Controllers reconcile CAPA CRs → EKS / VPC / workers |
 | Management host | **TBD** (not fixed in architecture) |
 | No secrets in git | Placeholders / local-only config |
+| Dev vs AWS | Keep Flux `resources: []` until ready; **git push enables AWS** via Flux |
 
 ## IAM
 
-`aws_iam/`: stacks **`capa-iam-common`** + **`capa-iam-eks`** (+ **`capa-iam-ec2`** for worker instance profile used by this flavor).
+`aws_iam/`: stacks **`capa-iam-common`** + **`capa-iam-eks`** (+ **`capa-iam-ec2`** for worker instance profile used by this flavor, including SSM).
 
 ## Layout
 
 | Path | Purpose |
 |------|---------|
-| `clusters/` | CAPA EKS cluster manifests |
-| `clusters/capi-eks-1.yaml` | First lab EKS cluster |
+| `clusters/` | CAPA EKS cluster manifests (Flux path; default empty) |
+| `clusters/capi-eks-1.yaml` | Lab EKS cluster + substrate hardens |
+| `kms/` | CMK for EKS secrets encryption (CLI CFN; not Flux) |
 
 ## Parallel path
 

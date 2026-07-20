@@ -18,14 +18,16 @@ Click the preview for the full SVG.
 
 | Path | Owns | Apply how |
 |------|------|-----------|
-| **`aws_eks/`** | EKS CAPA cluster YAML (`AWSManagedControlPlane`, workers) | CAPA (management host TBD) → AWS |
-| **`aws_iam/`** | CAPA IAM CloudFormation | `aws cloudformation deploy --template-file …` |
+| **`aws_eks/`** | EKS CAPA cluster YAML (`AWSManagedControlPlane`, workers) + optional KMS CFN | CAPA (management host TBD) → AWS; keep Flux `resources: []` in dev |
+| **`aws_iam/`** | CAPA IAM CloudFormation | `aws cloudformation deploy --template-file …` (only when applying) |
+| **`aws_cost/`** | Lab budget CFN (optional) | CLI deploy when ready — not Flux |
 
 ### Services plane (on EKS — architecture target)
 
 | Industry capability | Team name | Stack |
 |---------------------|-----------|--------|
 | Continuous delivery (GitOps CD) | CI/CD | Argo CD **Principal** + **Agent** |
+| Node autoscaling | Compute | Karpenter |
 | Backup & restore (also Workload) | Resilience | Velero |
 | Secrets management | Secrets | OpenBao |
 | Secrets synchronization | Secrets | External Secrets Operator |
@@ -71,4 +73,5 @@ Self-managed kubeadm path exists under [`aws_ec2/`](aws_ec2/) but is **not** the
 2. CAPA reconciles to **AWS**; **Services plane** (incl. Argo CD CI/CD) runs on **EKS**.  
 3. **Management cluster is TBD** — do not treat experimental mgmt paths as the design.  
 4. No secrets in git.  
-5. EKS lab cost floor: **2 AZs / 2 NATs** (`availabilityZoneUsageLimit: 2` on the managed control plane VPC).
+5. EKS lab cost floor: **2 AZs / 2 NATs** (`availabilityZoneUsageLimit: 2` on the managed control plane VPC).  
+6. **Dev mode:** do not enable Flux cluster resources or `git push` until you intend AWS creates.

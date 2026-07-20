@@ -1,6 +1,10 @@
 # CAPA EKS workload cluster — applied ONLY via Flux (aws-eks-clusters → Kind → CAPA → AWS).
 # Generated from: clusterctl generate cluster --infrastructure aws --flavor eks
 # Lab cost: 2 AZs / 2 NATs (EKS minimum AZs).
+#
+# WA substrate hardens (dev — do not enable Flux resources until ready to create AWS):
+#   logging, endpointAccess, encryptionConfig (CMK), tags, no SSH, OIDC for IRSA later.
+# Prerequisites when applying: deploy aws_eks/kms first; set PUBLIC_API_CIDR in kustomization.
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: Cluster
@@ -9,6 +13,7 @@ metadata:
   namespace: default
   labels:
     capa.lab/path: aws-eks
+    capa.lab/cost-center: scke-lab
 spec:
   clusterNetwork:
     pods:
@@ -37,8 +42,39 @@ metadata:
   namespace: default
 spec:
   region: PLACEHOLDER_AWS_REGION
-  sshKeyName: PLACEHOLDER_AWS_SSH_KEY_NAME
   version: v1.34.1
+  # Bastion SSH: empty string = do not attach a key (prefer SSM on nodes when live).
+  sshKeyName: ""
+  bastion:
+    enabled: false
+  # OIDC provider for future IRSA / Pod Identity work.
+  associateOIDCProvider: true
+  # Lab: private + public with CIDR allowlist (Kind mgmt is outside VPC).
+  # Prod target: private-only once management is in-VPC / VPN.
+  endpointAccess:
+    private: true
+    public: true
+    publicCIDRs:
+    - PLACEHOLDER_PUBLIC_API_CIDR
+  # Control-plane logs → CloudWatch (all five).
+  logging:
+    apiServer: true
+    audit: true
+    authenticator: true
+    controllerManager: true
+    scheduler: true
+  # Secrets encryption at rest. Deploy aws_eks/kms CFN before cluster create.
+  # Alias matches CAPA controllers-eks KMS grant condition (alias/cluster-api-provider-aws-*).
+  encryptionConfig:
+    provider: alias/cluster-api-provider-aws-eks-secrets
+    resources:
+    - secrets
+  additionalTags:
+    Project: scke
+    Environment: lab
+    Workload: capi-eks-1
+    ManagedBy: capa
+    CostCenter: scke-lab
   network:
     vpc:
       # EKS requires subnets in ≥2 AZs. Lab cost: 2 AZs ⇒ 2 NATs (not 3).
@@ -83,7 +119,19 @@ spec:
         eksLookupType: AmazonLinux2023
       iamInstanceProfile: nodes.cluster-api-provider-aws.sigs.k8s.io
       instanceType: t3.large
-      sshKeyName: PLACEHOLDER_AWS_SSH_KEY_NAME
+      # No standing SSH — use SSM Session Manager when nodes exist (node role has SSM policy).
+      sshKeyName: ""
+      publicIP: false
+      # AL2023 + CAPA: required when not using secrets-manager bootstrap path.
+      cloudInit:
+        insecureSkipSecretsManager: true
+      additionalTags:
+        Project: scke
+        Environment: lab
+        Workload: capi-eks-1
+        ManagedBy: capa
+        CostCenter: scke-lab
+        Role: worker
 ---
 apiVersion: bootstrap.cluster.x-k8s.io/v1beta2
 kind: NodeadmConfigTemplate
