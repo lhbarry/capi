@@ -1,0 +1,54 @@
+# Hold 5 Reserved services nodes: one t3.large-shaped pause pod per node.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reserved-services-overprovision
+  namespace: kube-system
+  labels:
+    capacity.scke.io/reservation: reserved
+    capacity.scke.io/plane: services
+    capacity.scke.io/component: overprovisioning
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: reserved-services-overprovision
+  template:
+    metadata:
+      labels:
+        app: reserved-services-overprovision
+        capacity.scke.io/reservation: reserved
+        capacity.scke.io/plane: services
+    spec:
+      priorityClassName: scke-overprovisioning
+      terminationGracePeriodSeconds: 0
+      tolerations:
+        - key: capacity.scke.io/plane
+          operator: Equal
+          value: services
+          effect: NoSchedule
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: reserved-services-overprovision
+              topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: capacity.scke.io/plane
+                    operator: In
+                    values: ["services"]
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.10
+          resources:
+            requests:
+              # One reference worker (t3.large): 2 vCPU, 8 GiB
+              cpu: "2"
+              memory: 8Gi
+            limits:
+              cpu: "2"
+              memory: 8Gi

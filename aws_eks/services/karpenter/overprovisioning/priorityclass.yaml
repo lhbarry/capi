@@ -1,0 +1,13 @@
+# Lower than normal workloads so real pods preempt pause/headroom capacity.
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: scke-overprovisioning
+  labels:
+    capacity.scke.io/component: overprovisioning
+value: -10
+globalDefault: false
+preemptionPolicy: Never
+description: >
+  Preemptible capacity holders for Reserved node floors and 1.5× worker headroom.
+  Real Services/Workload pods must use a higher PriorityClass (default 0+).

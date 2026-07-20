@@ -58,13 +58,28 @@
 
 ---
 
+## Also landed (same day): Karpenter Services capacity
+
+Path: `aws_eks/services/karpenter/` (**not** Flux — only `aws_eks/clusters` is).
+
+| Reservation | Count | Mechanism |
+|-------------|------:|-----------|
+| Management | **3 Reserved** | Documented target (`management-reserved.md`) — separate cluster |
+| Services | **5 Reserved** | NodePool + 5× pause overprovision (`t3.large` each) |
+| Workload | **5 Reserved** | NodePool + 5× pause overprovision |
+| Headroom | **1.5 × worker** | 3 CPU / 12 GiB preemptible pause on `elastic` pool |
+
+Do not apply until cluster + Karpenter controller + discovery tags exist.
+
+---
+
 ## Next (pick one)
 
 ### A — Stay pure-dev (recommended until ready for $)
 
 1. Local CI-ish checks (kubeconform / kustomize script) without Flux enable.  
 2. Architecture: decide **management plane**, or disposition more `platform-candidates`.  
-3. Design-only Services plane (Argo CD) manifests under a non-Flux path or still-empty kustomize.  
+3. Next Services plane piece (Argo CD) under `aws_eks/services/`.  
 4. Pillar deep-dive `/security-assessment` or re-score after hardens.
 
 ### B — Leave pure-dev (creates AWS when done end-to-end)

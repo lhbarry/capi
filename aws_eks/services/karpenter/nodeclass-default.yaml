@@ -1,0 +1,32 @@
+# EC2NodeClass for Services Cluster (CAPA EKS).
+# Adjust role / discovery tags to match live IAM and CAPA-created VPC.
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: default
+  labels:
+    capa.lab/path: aws-eks
+    capacity.scke.io/component: karpenter
+spec:
+  # Node instance profile/role used by Karpenter-launched nodes.
+  # Default aligns with CAPA node role name until a dedicated Karpenter node role lands.
+  role: nodes.cluster-api-provider-aws.sigs.k8s.io
+  amiSelectorTerms:
+    - alias: al2023@latest
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: capi-eks-1
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: capi-eks-1
+  tags:
+    Project: scke
+    Environment: lab
+    Workload: capi-eks-1
+    ManagedBy: karpenter
+    CostCenter: scke-lab
+  metadataOptions:
+    httpEndpoint: enabled
+    httpProtocolIPv6: disabled
+    httpPutResponseHopLimit: 2
+    httpTokens: required

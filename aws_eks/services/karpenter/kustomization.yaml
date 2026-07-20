@@ -1,0 +1,10 @@
+# Services-plane Karpenter config for the EKS Services Cluster.
+# NOT under Flux path aws_eks/clusters — apply only when intentional.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - nodeclass-default.yaml
+  - nodepool-reserved-services.yaml
+  - nodepool-reserved-workload.yaml
+  - nodepool-elastic.yaml
+  - overprovisioning

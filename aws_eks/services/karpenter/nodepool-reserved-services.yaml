@@ -1,0 +1,60 @@
+# 5 nodes Reserved for Services plane workloads.
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: reserved-services
+  labels:
+    capacity.scke.io/reservation: reserved
+    capacity.scke.io/plane: services
+    capa.lab/path: aws-eks
+spec:
+  weight: 20
+  template:
+    metadata:
+      labels:
+        capacity.scke.io/reservation: reserved
+        capacity.scke.io/plane: services
+      annotations:
+        capacity.scke.io/reserved-count: "5"
+    spec:
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+      taints:
+        - key: capacity.scke.io/plane
+          value: services
+          effect: NoSchedule
+      requirements:
+        - key: kubernetes.amazonaws.com/instance-category
+          operator: In
+          values: ["t", "m"]
+        - key: kubernetes.amazonaws.com/instance-generation
+          operator: Gt
+          values: ["2"]
+        - key: kubernetes.amazonaws.com/instance-size
+          operator: In
+          values: ["large", "xlarge"]
+        - key: kubernetes.amazonaws.com/instance-cpu
+          operator: In
+          values: ["2", "4"]
+        - key: kubernetes.amazonaws.com/instance-hypervisor
+          operator: In
+          values: ["nitro"]
+        - key: kubernetes.amazonaws.com/capacity-type
+          operator: In
+          values: ["on-demand"]
+        - key: topology.kubernetes.io/zone
+          operator: Exists
+        - key: kubernetes.amazonaws.com/instance-cpu-manufacturer
+          operator: In
+          values: ["intel", "amd"]
+  # ~5 × t3.large (2 vCPU / 8 GiB) with margin
+  limits:
+    cpu: "12"
+    memory: 48Gi
+  disruption:
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: 30m
+    budgets:
+      - nodes: "10%"

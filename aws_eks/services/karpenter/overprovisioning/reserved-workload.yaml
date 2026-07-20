@@ -1,0 +1,53 @@
+# Hold 5 Reserved workload nodes: one t3.large-shaped pause pod per node.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reserved-workload-overprovision
+  namespace: kube-system
+  labels:
+    capacity.scke.io/reservation: reserved
+    capacity.scke.io/plane: workload
+    capacity.scke.io/component: overprovisioning
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: reserved-workload-overprovision
+  template:
+    metadata:
+      labels:
+        app: reserved-workload-overprovision
+        capacity.scke.io/reservation: reserved
+        capacity.scke.io/plane: workload
+    spec:
+      priorityClassName: scke-overprovisioning
+      terminationGracePeriodSeconds: 0
+      tolerations:
+        - key: capacity.scke.io/plane
+          operator: Equal
+          value: workload
+          effect: NoSchedule
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: reserved-workload-overprovision
+              topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: capacity.scke.io/plane
+                    operator: In
+                    values: ["workload"]
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.10
+          resources:
+            requests:
+              cpu: "2"
+              memory: 8Gi
+            limits:
+              cpu: "2"
+              memory: 8Gi

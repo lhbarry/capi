@@ -1,0 +1,49 @@
+# Elastic pool: burst demand + 1.5× worker headroom (waiting capacity).
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: elastic
+  labels:
+    capacity.scke.io/reservation: elastic
+    capacity.scke.io/plane: shared
+    capa.lab/path: aws-eks
+spec:
+  weight: 10
+  template:
+    metadata:
+      labels:
+        capacity.scke.io/reservation: elastic
+        capacity.scke.io/plane: shared
+    spec:
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+      # No plane taint — headroom and general burst schedule here.
+      requirements:
+        - key: kubernetes.amazonaws.com/instance-category
+          operator: In
+          values: ["t", "m", "c"]
+        - key: kubernetes.amazonaws.com/instance-generation
+          operator: Gt
+          values: ["2"]
+        - key: kubernetes.amazonaws.com/instance-size
+          operator: In
+          values: ["large", "xlarge", "2xlarge"]
+        - key: kubernetes.amazonaws.com/instance-hypervisor
+          operator: In
+          values: ["nitro"]
+        - key: kubernetes.amazonaws.com/capacity-type
+          operator: In
+          values: ["on-demand", "spot"]
+        - key: topology.kubernetes.io/zone
+          operator: Exists
+        - key: kubernetes.amazonaws.com/instance-cpu-manufacturer
+          operator: In
+          values: ["intel", "amd"]
+  limits:
+    cpu: "64"
+    memory: 256Gi
+  disruption:
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 5m

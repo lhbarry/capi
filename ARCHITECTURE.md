@@ -184,7 +184,18 @@ Shared **platform services** that run on the EKS workload cluster. They are not 
 
 **CI/CD is a Services-plane capability** (not a separate plane): Argo CD Principal and Agent live here with the other platform services.
 
-**Status:** architecture target (capabilities defined here). Manifests / GitOps wiring not yet in-repo.
+**Status:** architecture target (capabilities defined here). **Karpenter** manifests live under [`aws_eks/services/karpenter/`](aws_eks/services/karpenter/) (not Flux-wired). Other services still design-only.
+
+### Capacity model (Reserved + headroom)
+
+| Domain | Reserved nodes | Owner / mechanism |
+|--------|---------------:|-------------------|
+| **Management** cluster | **3** | Fixed capacity when mgmt host is chosen — labels `capacity.scke.io/reservation=reserved`, `plane=management` ([management-reserved.md](aws_eks/services/karpenter/management-reserved.md)) |
+| **Services** plane | **5** | Karpenter NodePool `reserved-services` + 5× pause overprovisioning |
+| **Workload** plane | **5** | Karpenter NodePool `reserved-workload` + 5× pause overprovisioning |
+| **Waiting headroom** | **≥ 1.5 × one worker** CPU **and** RAM | Karpenter `elastic` NodePool + preemptible pause pod (**3 vCPU / 12 GiB** vs reference `t3.large` 2 / 8 GiB) |
+
+Reference worker: CAPA/Karpenter **`t3.large`**. Reserved nodes carry `capacity.scke.io/reservation=reserved` and a plane label/taint (`services` / `workload` / `management`). Full write-up: [`aws_eks/services/karpenter/capacity.md`](aws_eks/services/karpenter/capacity.md).
 
 ### Capability catalog
 
@@ -248,7 +259,7 @@ Industry language: **GitOps continuous delivery** with Principal (hub/control) +
 | Flow | Components |
 |------|------------|
 | Deploy services/apps | Git → Argo CD Principal → Agent (Workload + Services) on EKS |
-| Node capacity | **Karpenter** on Services plane provisions/right-sizes EC2 for pending pods |
+| Node capacity | **Karpenter** on Services plane: **5 Reserved** services + **5 Reserved** workload + **1.5× worker** waiting headroom; mgmt **3 Reserved** on management cluster |
 | Serverless / scale-to-zero | **Knative** on Workload plane |
 | Backup / restore | **Velero** on Workload + Services (snapshots / object storage, often **S3**) |
 | Login to operator UIs | Keycloak + OAuth2 Proxy (incl. Argo CD UI) |
@@ -284,14 +295,14 @@ Add more rows here and on the SVG as the platform grows.
 | Apply path for apps / peer services | **Argo CD** |
 | On Prem / AWS Services | Vertical side surfaces — not planes; inventory grows over time |
 | Isolation | Dedicated namespaces per capability (and later network policies) |
-| Lab sizing | Single EKS holds workload + services; production may multi-cluster later |
+| Lab sizing | Single EKS holds workload + services; capacity model 5+5 Reserved + headroom (costly if fully applied); production may multi-cluster later |
 
 ### Lab vs production (services)
 
 | Capability | Lab target | Production target |
 |------------|------------|-------------------|
 | Argo CD Principal + Agent (CI/CD) | Principal on Services; Agent on Workload + Services | HA Principal, agents per cluster, SSO, AppProjects |
-| Karpenter | Services plane; NodePools / EC2NodeClass | Disruption budgets, multi-AZ, cost consolidation, IRSA |
+| Karpenter | Services plane; NodePools + reserved 5/5 + 1.5× headroom ([manifests](aws_eks/services/karpenter/)) | Disruption budgets, multi-AZ, cost consolidation, dedicated IRSA/node role |
 | Knative | Serving on Workload (lab scale) | Production quotas, eventing scope, multi-tenant limits |
 | Velero | Workload + Services; backup to S3 | Scheduled backups, immutability, restore runbooks, multi-cluster |
 | OpenBao | Single-node / lab HA mode | HA, auto-unseal, audit, policies, namespaces |
@@ -315,7 +326,7 @@ Add more rows here and on the SVG as the platform grows.
 | Cluster lifecycle | CAPA → EKS (`aws_eks/`) | Same + policy gates, promotion envs |
 | Services / app CD | Argo CD in **Services plane** (target) | HA Principal + agents, SSO, AppProjects |
 | VPC / NAT | 2 AZs / 2 NATs | 3 AZs; consider VPC endpoints to cut NAT |
-| Workers | 1 × `t3.large` | ≥2–3 multi-AZ (services plane needs headroom) |
+| Workers | CAPA bootstrap 1 × `t3.large`; Karpenter targets **5 Reserved services + 5 Reserved workload + 1.5× headroom** | Same model; multi-AZ; dedicated Karpenter node role |
 | EKS API access | Private + public with `PUBLIC_API_CIDR` allowlist | Private-only when mgmt is in-VPC / VPN |
 | Control-plane logs | All five explicit → CloudWatch | Same + retention / SIEM |
 | Secrets encryption | CMK alias in YAML (`aws_eks/kms`) | Same; key policy reviews |
@@ -381,6 +392,7 @@ Prefer order:
    - **Done (YAML, 2026-07-20):** endpoint allowlist, CP logging, secrets CMK alias, OIDC, tags, no SSH / SSM policy on node role  
    - **Open:** worker capacity for services, deploy CMK/budget when leaving pure-dev, private-only API when mgmt in-VPC  
 4. Land **Services plane**, starting with **CI/CD** (Argo CD Principal + Agent on EKS)  
+   - **Partial:** Karpenter capacity model + NodePools in `aws_eks/services/karpenter/` (not Flux-applied)  
 5. Land peer services via Argo (secrets, IdP, Harbor, CNPG, OTel, LGTM, …)  
 6. CI validation of CAPA + services manifests; CI → Harbor image flow  
 7. IRSA / Pod Identity for each service (OIDC already associated on CAPA EKS)  

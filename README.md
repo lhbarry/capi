@@ -18,7 +18,7 @@ Click the preview for the full SVG.
 
 | Path | Owns | Apply how |
 |------|------|-----------|
-| **`aws_eks/`** | EKS CAPA cluster YAML (`AWSManagedControlPlane`, workers) + optional KMS CFN | CAPA (management host TBD) → AWS; keep Flux `resources: []` in dev |
+| **`aws_eks/`** | EKS CAPA cluster YAML + optional KMS CFN; **Services plane** under `aws_eks/services/` (Karpenter first) | CAPA → AWS for clusters; services **not** Flux-wired yet; keep Flux `resources: []` in dev |
 | **`aws_iam/`** | CAPA IAM CloudFormation | `aws cloudformation deploy --template-file …` (only when applying) |
 | **`aws_cost/`** | Lab budget CFN (optional) | CLI deploy when ready — not Flux |
 
@@ -27,7 +27,7 @@ Click the preview for the full SVG.
 | Industry capability | Team name | Stack |
 |---------------------|-----------|--------|
 | Continuous delivery (GitOps CD) | CI/CD | Argo CD **Principal** + **Agent** |
-| Node autoscaling | Compute | Karpenter |
+| Node autoscaling | Compute | Karpenter — **5 Reserved** services + **5 Reserved** workload + **1.5× worker** headroom; mgmt **3 Reserved** (separate). Manifests: [`aws_eks/services/karpenter/`](aws_eks/services/karpenter/) |
 | Backup & restore (also Workload) | Resilience | Velero |
 | Secrets management | Secrets | OpenBao |
 | Secrets synchronization | Secrets | External Secrets Operator |
