@@ -1,8 +1,10 @@
-# CAPA EKS — Workload cluster (applications)
-# Argo CD Agent (reports to Services Principal; independent), Knative, tenant apps.
-# Managed by CAPA on the Management cluster. No Argo Principal on this cluster.
+# CAPA EKS — Workload cluster (applications) — Cluster #3
+# Argo CD Agent (→ Services Principal; independent), Knative, tenant apps.
+# Karpenter installs HERE ONLY (Reserved workload + 1.5× headroom).
+# Created by: Management Turtles/CAPI/CAPA after Services cluster.
+# No Argo Principal on this cluster.
 #
-# Prerequisites: aws_iam stacks, aws_eks/kms CMK. Keep parent kustomization resources empty until promote.
+# Prerequisites: Services cluster + aws_iam + kms. Keep kustomization resources empty until promote.
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: Cluster

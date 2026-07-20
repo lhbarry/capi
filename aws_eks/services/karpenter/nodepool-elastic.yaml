@@ -15,11 +15,11 @@ spec:
         capacity.scke.io/reservation: elastic
         capacity.scke.io/plane: shared
     spec:
-      # Install a copy of this NodePool per cluster; point nodeClassRef at services or workload.
+      # Workload cluster only
       nodeClassRef:
         group: karpenter.k8s.aws
         kind: EC2NodeClass
-        name: services
+        name: workload
       # No plane taint — headroom and general burst schedule here.
       requirements:
         - key: kubernetes.amazonaws.com/instance-category

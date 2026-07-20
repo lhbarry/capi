@@ -1,7 +1,7 @@
+# Workload cluster only (parent karpenter kustomization lists these explicitly too)
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - priorityclass.yaml
-  - reserved-services.yaml
   - reserved-workload.yaml
   - headroom.yaml

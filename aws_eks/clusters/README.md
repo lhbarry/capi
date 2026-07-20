@@ -5,8 +5,10 @@
 | Cluster | Path | CAPA name | Role |
 |---------|------|-----------|------|
 | **Management** | [`management/`](../../management/) | N/A (RKE2) | Rancher, CAPI/CAPA |
-| **Services** | [`services/cluster.yaml`](services/cluster.yaml) | `capi-eks-services` | Argo Principal + ApplicationController, platform |
-| **Workload** | [`workload/cluster.yaml`](workload/cluster.yaml) | `capi-eks-workload` | Argo Agent, apps |
+| **Services** | [`services/cluster.yaml`](services/cluster.yaml) | `capi-eks-services` | Principal + AppController; CAPA **5 Reserved** (no Karpenter) |
+| **Workload** | [`workload/cluster.yaml`](workload/cluster.yaml) | `capi-eks-workload` | Agent; **Karpenter only here** |
+
+**Order:** Management → Services CAPA → Workload CAPA — [docs/provisioning-order.md](../../docs/provisioning-order.md)
 
 Legacy monocluster `capi-eks-1` is **removed** (split into the two CAPA definitions above).
 
@@ -34,10 +36,9 @@ Keep `resources: []` in this kustomization and in `services/` / `workload/` unti
 
 ## Karpenter
 
-| Cluster | Install | Discovery tag |
-|---------|---------|-----------------|
-| Services | `aws_eks/services/karpenter/` (services pools + headroom) | `karpenter.sh/discovery: capi-eks-services` |
-| Workload | Workload NodePools / headroom (see karpenter README) | `karpenter.sh/discovery: capi-eks-workload` |
+**Workload cluster only** — [`../services/karpenter/`](../services/karpenter/).  
+Discovery: `karpenter.sh/discovery: capi-eks-workload`.  
+Services capacity = CAPA MD replicas **5**.
 
 ## IAM
 

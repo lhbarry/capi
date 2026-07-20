@@ -1,37 +1,38 @@
-# Karpenter — Services plane (Compute)
+# Karpenter — Workload cluster only
 
-**Placement:** Install Karpenter **per EKS cluster** (`capi-eks-services` and `capi-eks-workload`).  
-**Status:** Production capacity design in-repo. Not Flux-wired.
+**Locked:** Karpenter installs **only** on **Workload** EKS (`capi-eks-workload`).  
+**Not** on Services. **Not** on Management.
 
-## What this provides
+| Cluster | Node capacity mechanism |
+|---------|-------------------------|
+| Management | Fixed 3 × m7i.xlarge (RKE2) |
+| Services | CAPA MachineDeployment **5 Reserved** (`aws_eks/clusters/services/`) |
+| Workload | CAPA bootstrap **2** + **Karpenter** (5 Reserved + 1.5× headroom) |
 
-| Piece | Purpose |
-|-------|---------|
-| `EC2NodeClass` | AMI, subnet/SG discovery, instance profile for Karpenter nodes |
-| `NodePool/reserved-services` | Up to **5 Reserved** services nodes |
-| `NodePool/reserved-workload` | Up to **5 Reserved** workload nodes |
-| `NodePool/elastic` | Burst + **1.5 × worker** waiting headroom |
-| `overprovisioning/` | Pause pods that **hold** reserved counts + headroom |
-| `capacity.md` | Full capacity model |
-| `management-reserved.md` | **3 Reserved** management nodes (separate cluster) |
+## Components (Workload)
 
-## Prerequisites (production apply)
+| Resource | File |
+|----------|------|
+| EC2NodeClass | `nodeclass-workload.yaml` (`karpenter.sh/discovery: capi-eks-workload`) |
+| NodePool reserved | `nodepool-reserved-workload.yaml` |
+| NodePool elastic | `nodepool-elastic.yaml` |
+| Overprovision | `overprovisioning/reserved-workload.yaml` + `headroom.yaml` |
 
-1. Target EKS up (Services and/or Workload) with OIDC, CMK, CP logging.  
-2. Karpenter controller (Helm) + **IRSA/Pod Identity** on **that** cluster — see `install.md`.  
-3. CAPA bootstrap **≥2** system nodes.  
-4. Tag subnets/SGs `karpenter.sh/discovery: capi-eks-services` or `capi-eks-workload`.  
-5. Apply only the NodeClass/NodePools for that cluster (do not apply workload pools on services API and vice versa).
+## Prerequisites (Workload)
 
-## Apply (intentional only — not Flux)
+1. Workload EKS Ready (provisioned via Management CAPA — step 3).  
+2. OIDC + IRSA/Pod Identity for Karpenter controller.  
+3. Subnet/SG tags `karpenter.sh/discovery: capi-eks-workload`.  
+4. Bootstrap nodes ≥2 for system + Karpenter pods.
 
-```bash
-# After controller install:
-kubectl apply -k aws_eks/services/karpenter/
-```
+## Install
 
-## Validate (local, no cluster required for kustomize)
+See [install.md](install.md). Apply kustomize **to Workload kubeconfig only**.
 
 ```bash
-kubectl kustomize aws_eks/services/karpenter/ | head
+kubectl --context workload apply -k aws_eks/services/karpenter/
 ```
+
+## Capacity detail
+
+[capacity.md](capacity.md)

@@ -29,7 +29,7 @@ Arch. adaptation from On-Prem to AWS Cloud Services Hosting — **Cluster API + 
 | Industry capability | Team name | Stack |
 |---------------------|-----------|--------|
 | Continuous delivery (GitOps CD) | CI/CD | Argo CD: **Principal + ApplicationController** (Services), **Agent** (Workload, independent). [`aws_eks/services/argocd/`](aws_eks/services/argocd/) |
-| Node autoscaling | Compute | Karpenter — **5 Reserved** services + **5 Reserved** workload + **1.5× worker** headroom; mgmt **3 Reserved**. [`aws_eks/services/karpenter/`](aws_eks/services/karpenter/) |
+| Node autoscaling | Compute | **Karpenter on Workload only** (5 Reserved + 1.5× headroom). Services: CAPA **5 Reserved**. Mgmt: **3**. [`aws_eks/services/karpenter/`](aws_eks/services/karpenter/) |
 | Backup & restore (also Workload) | Resilience | Velero |
 | Secrets management | Secrets | OpenBao |
 | Secrets synchronization | Secrets | External Secrets Operator |
@@ -70,9 +70,9 @@ Self-managed kubeadm path — **not** the production focus; later mirror of this
 ## Rules
 
 1. **YAML first** for AWS and platform changes.  
-2. CAPA → **AWS**; Services plane (incl. Argo CD, Karpenter) on **EKS**.  
-3. **Production WAF targets** in ARCHITECTURE §1.1 — design to those scores.  
-4. **Reserved capacity is intentional** (3 / 5 / 5 + 1.5× headroom).  
-5. No secrets in git.  
-6. Substrate production floor: **3 AZs**, bootstrap **≥2**, hardens on (logging, CMK, OIDC, SSM).  
-7. Experimental Flux on Kind is not the production CD story; do not enable cluster resources until an intentional environment promotion.
+2. Provision **Management → Services → Workload** ([docs/provisioning-order.md](docs/provisioning-order.md)).  
+3. **Karpenter on Workload only.**  
+4. **Production WAF** targets §1.1; score to date §1.2 / [docs/wa-scorecard.md](docs/wa-scorecard.md).  
+5. Reserved capacity intentional (mgmt 3 / Services CAPA 5 / Workload Karpenter 5 + headroom).  
+6. No secrets in git.  
+7. Experimental Kind Flux is not production; keep CAPA `resources: []` until intentional promote.

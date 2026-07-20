@@ -27,8 +27,8 @@ Design and implement **production-grade create/manage of EKS on AWS** with:
 | Cluster lifecycle API | [Cluster API](https://cluster-api.sigs.k8s.io/) (CAPI) |
 | AWS provider | [CAPA](https://cluster-api-aws.sigs.k8s.io/) |
 | Control plane | **Amazon EKS** via CAPA `AWSManagedControlPlane` |
-| Workers | CAPA bootstrap nodes + **Karpenter** for Reserved Services/Workload capacity |
-| Services plane | Shared platform on EKS: CI/CD, compute (Karpenter), data, registry, identity, observability (see §7) |
+| Workers | Services: CAPA Reserved MD; Workload: CAPA bootstrap + **Karpenter** (Workload only) |
+| Services plane | Platform on **Services EKS**: CI/CD (Principal + ApplicationController), data, registry, identity, observability (see §7) |
 | Desired state | Git (this repository) for CAPA YAML, IAM, and Services manifests |
 | Management plane | **SUSE Rancher** on **RKE2**, **3 nodes Reserved** ([ADR-001](docs/adr/001-management-cluster-rancher.md)) |
 | CAPA IAM | CloudFormation under `aws_iam/` only |
@@ -49,7 +49,26 @@ Design and implement **production-grade create/manage of EKS on AWS** with:
 | Cost Optimization | **≥ 3.5** | Tags, budgets, Karpenter consolidation on elastic, VPC endpoints vs NAT tradeoff |
 | Sustainability | **≥ 3.5** | Right-size, scale-to-zero where safe (Knative), avoid idle waste outside Reserved floors |
 
-**Overall target:** **≥ 3.8 / 5** with **no open Critical** findings on the production path. Lab-era score (~2.6 design) is baseline; close gaps deliberately (this document + manifests).
+**Overall target:** **≥ 3.8 / 5** with **no open Critical** findings on the production path.
+
+### 1.2 Well-Architected score — design to date (2026-07-20)
+
+Score reflects **in-repo production design + evidence**, not fully deployed live platform. Criticality: production. Calibration: design maturity vs runtime proof.
+
+| Pillar | Score | Critical | High | Notes |
+|--------|------:|---------:|-----:|-------|
+| Operational Excellence | **3.2** | 0 | 2 | GitOps YAML, three-cluster order, Argo topology, Turtles/CAPA path documented; CI gates / runbooks incomplete |
+| Security | **2.8** | 0 | 3 | CP logs, CMK, OIDC, SSM, endpoint allowlist in CAPA YAML; detection, IRSA per service, SIEM still open |
+| Reliability | **3.0** | 0 | 2 | 3 AZ, dual EKS, mgmt 3-node, Services 5 CAPA reserved, Workload Karpenter+headroom; Velero drills not designed yet |
+| Performance Efficiency | **2.7** | 0 | 1 | Karpenter on Workload only; Services fixed CAPA size; no metrics process yet |
+| Cost Optimization | **2.8** | 0 | 1 | Tags, budget template, intentional Reserved floors; budgets not deployed; dual EKS cost real |
+| Sustainability | **2.6** | 0 | 1 | Headroom/Karpenter on Workload; Services fixed 5; region/carbon process open |
+
+**Overall (design): ~2.9 / 5** (up from lab ~2.1 and interim ~2.6).  
+
+**Target gap:** mainly runtime install (Management → Services → Workload), IRSA, Velero+restore, detection, Argo/Karpenter live, CI policy gates → path to **≥ 3.8**.
+
+Full narrative scorecard: [docs/wa-scorecard.md](docs/wa-scorecard.md).
 
 ---
 
@@ -58,46 +77,48 @@ Design and implement **production-grade create/manage of EKS on AWS** with:
 ```text
   ┌ On Prem ────┐     Git · management/ · aws_eks/ · aws_iam/     ┌ AWS Services ─┐
   │ AD/LDAP     │                                                   │ EFS · EBS · S3 │
-  │ SMTP        │     Management (Rancher/RKE2 × 3)  Identity CFN  │               │
-  │ MS Teams    │              │                                   └───────────────┘
-  └─────────────┘              ├──► Services EKS (capi-eks-services)
-                               └──► Workload EKS (capi-eks-workload)
+  │ SMTP        │     1. Management (Rancher/RKE2 + Turtles/CAPI/CAPA)
+  │ MS Teams    │              │
+  └─────────────┘              ├── 2. CAPA → Services EKS (no Karpenter)
+                               └── 3. CAPA → Workload EKS (Karpenter only here)
 ```
 
-**Three clusters:** [docs/clusters.md](docs/clusters.md). Visual: [docs/architecture.svg](docs/architecture.svg) (update when diagram is redrawn).
+**Three clusters:** [docs/clusters.md](docs/clusters.md).  
+**Apply order:** [docs/provisioning-order.md](docs/provisioning-order.md) (Management → Services → Workload).
 
 ### Clusters, planes, side surfaces
 
 | Layer | Kind | Where | What lives there |
 |-------|------|-------|------------------|
 | **Source of truth** | Plane | Git | CAPA YAML, IAM, management, services manifests |
-| **Management** | **Cluster #1** | RKE2 + Rancher (`management/`) | Rancher, CAPI/CAPA → provisions Services + Workload EKS |
+| **Management** | **Cluster #1** | RKE2 + Rancher + **Turtles/CAPI/CAPA** | Provisions Services then Workload via CAPA |
 | **Identity bootstrap** | Plane | AWS IAM CFN | CAPA controllers + EKS roles + node profiles |
-| **Services** | **Cluster #2** | EKS `capi-eks-services` | Argo **Principal + ApplicationController**, Karpenter, platform peers |
-| **Workload** | **Cluster #3** | EKS `capi-eks-workload` | Argo **Agent**, Knative, apps; no Principal |
+| **Services** | **Cluster #2** | EKS `capi-eks-services` | Principal + ApplicationController; **CAPA 5 Reserved** (no Karpenter) |
+| **Workload** | **Cluster #3** | EKS `capi-eks-workload` | Agent; **Karpenter** (5 Reserved + headroom); apps |
 | **On Prem / AWS Services** | Side surfaces | Margins | AD/LDAP, SMTP, Teams · EFS/EBS/S3 |
 
-**Critical rule:** CAPA on **Management** creates **two** EKS clusters (Services + Workload). Argo Principal never co-locates with Agent.
+**Critical rules:** (1) Provision **1 → 2 → 3**. (2) **Karpenter on Workload only**. (3) Argo Principal never co-locates with Agent.
 
 ---
 
 ## 3. Control flow (target)
 
 ```text
-1. Edit YAML in git (aws_eks cluster specs, aws_iam templates, later services)
-2. CAPA on management (Rancher/RKE2) reconciles CAPA CRs → EKS + VPC + workers
-3. Operator (when IAM changes):
-      aws cloudformation deploy --template-file aws_iam/*.yaml
-4. Services EKS: Argo CD Principal + ApplicationController (+ peers); Workload EKS: Agent
-   delivers platform and apps from git (Agent independent of Principal)
+1. Install Management (Ubuntu ×3, RKE2, Rancher, Turtles / CAPI / CAPA)
+2. CAPA on Management creates Services EKS (git: aws_eks/clusters/services)
+3. CAPA on Management creates Workload EKS (git: aws_eks/clusters/workload)
+4. Install platform: Argo Principal+AppController on Services; Karpenter+Agent on Workload
+5. IAM/KMS CFN from git when needed (before CAPA EKS create)
 ```
+
+Full sequence: [docs/provisioning-order.md](docs/provisioning-order.md).
 
 | Layer | Commitment |
 |-------|------------|
-| Management cluster | **SUSE Rancher** on **RKE2**, 3 Reserved nodes ([ADR-001](docs/adr/001-management-cluster-rancher.md)) |
-| Workload / Services cluster shape | CAPA → Amazon EKS + bootstrap + Karpenter (`aws_eks/`) |
+| Management | Rancher/RKE2 + **Turtles/CAPI/CAPA** ([ADR-001](docs/adr/001-management-cluster-rancher.md)) |
+| Services EKS | CAPA; **5 Reserved MD**; **no Karpenter**; Argo Principal + ApplicationController |
+| Workload EKS | CAPA; bootstrap 2 + **Karpenter only here**; Argo Agent |
 | IAM for CAPA | CloudFormation in `aws_iam/` |
-| Services + app CD | Argo CD **Principal + ApplicationController** on Services; **Agent** on Workload (separate clusters) |
 
 IAM is deployed with the AWS CLI from templates in git (YAML-first, not console-first).
 
@@ -178,11 +199,11 @@ Karpenter (per cluster)
 | Bootstrap worker `replicas` | `2` | HA for system pods (Karpenter, CNI, CoreDNS) until node role splits |
 | Kubernetes version | `v1.34.1` | Pinned in CAPA + MD |
 | Reference instance | `t3.large` (or equal family) | Unit for Reserved sizing + 1.5× headroom math |
-| Services Reserved | **5 nodes** | Karpenter + overprovisioning |
-| Workload Reserved | **5 nodes** | Karpenter + overprovisioning |
-| Management Reserved | **3 nodes** | Separate management cluster |
-| Waiting headroom | **≥ 1.5 × one worker** CPU+RAM | Preemptible overprovisioning |
-| Pod CIDR | `192.168.0.0/16` | `Cluster.spec.clusterNetwork` |
+| Services Reserved | **5 nodes** | CAPA MD replicas: 5 (**no Karpenter**) |
+| Workload Reserved | **5 nodes** + headroom | **Karpenter on Workload only** |
+| Management Reserved | **3 nodes** | RKE2 / Rancher |
+| Waiting headroom | **≥ 1.5 × one worker** | Workload Karpenter elastic |
+| Pod CIDR | Services `10.96.0.0/16` · Workload `10.97.0.0/16` | Separate clusters |
 | Region | kustomize param `AWS_REGION` | Per environment |
 | Node / bastion SSH | empty; bastion off | SSM only (WAF SEC) |
 | Public API CIDR | kustomize `PUBLIC_API_CIDR` | Tight allowlist; prefer private-only when mgmt in-VPC |
@@ -191,33 +212,31 @@ Karpenter (per cluster)
 | OIDC | `associateOIDCProvider: true` | IRSA / Pod Identity foundation |
 | Cost tags | Project / Environment / CostCenter / … | Attribution (WAF COST) |
 
-**AWS-managed:** EKS control-plane HA, control-plane patching, etcd.  
-**CAPA-managed:** VPC/subnets/NAT (AZ limit), bootstrap worker lifecycle.  
-**Karpenter-managed:** Reserved Services/Workload pools + elastic headroom/burst.
+**AWS-managed:** EKS control-plane HA, patching, etcd.  
+**CAPA-managed:** Services + Workload EKS; Services Reserved MD; Workload bootstrap.  
+**Karpenter-managed (Workload only):** reserved-workload + elastic headroom.
 
-**Pinned in YAML:** endpoint access, logging, CMK encryption, OIDC, tags, no SSH, capacity model.  
-**Open for production completeness:** dedicated Karpenter node role/IRSA, management host choice, Argo + peer Services, Velero drills, detection stack, CI policy gates, VPC endpoints.
+**Open:** Karpenter IRSA, Velero drills, detection, live Argo install, CI gates, VPC endpoints.
 
 ---
 
 ## 7. Services plane
 
-Shared **platform services** that run on the EKS workload cluster. They are not CAPA cluster objects; they are the capabilities product teams and operators consume.
+Shared **platform services** on the **Services EKS** cluster (not CAPA CRs themselves).
 
-**CI/CD** spans Services and Workload: **Principal + ApplicationController** on Services; **Agent** only on Workload (no co-location).
+**CI/CD** spans clusters: **Principal + ApplicationController** on Services; **Agent** on Workload only.
 
-**Status:** **production design.** **Karpenter** capacity is specified in-repo under [`aws_eks/services/karpenter/`](aws_eks/services/karpenter/). Remaining Services (Argo CD, secrets, IdP, Harbor, CNPG, obs, Velero) are **next implementation slices** toward the WAF target — not optional lab extras.
+**Status:** production design. **Karpenter = Workload only** ([`aws_eks/services/karpenter/`](aws_eks/services/karpenter/)). Argo design under [`aws_eks/services/argocd/`](aws_eks/services/argocd/).
 
 ### Capacity model (Reserved + headroom)
 
 | Domain | Reserved nodes | Owner / mechanism |
 |--------|---------------:|-------------------|
-| **Management** cluster | **3** | RKE2 servers under **SUSE Rancher** — labels `capacity.scke.io/reservation=reserved`, `plane=management` ([ADR-001](docs/adr/001-management-cluster-rancher.md)) |
-| **Services** plane | **5** | Karpenter NodePool `reserved-services` + 5× pause overprovisioning |
-| **Workload** plane | **5** | Karpenter NodePool `reserved-workload` + 5× pause overprovisioning |
-| **Waiting headroom** | **≥ 1.5 × one worker** CPU **and** RAM | Karpenter `elastic` NodePool + preemptible pause pod (**3 vCPU / 12 GiB** vs reference `t3.large` 2 / 8 GiB) |
+| **Management** | **3** | RKE2 / Rancher ([ADR-001](docs/adr/001-management-cluster-rancher.md)) |
+| **Services** | **5** | CAPA MD replicas: 5 — **no Karpenter** |
+| **Workload** | **5** + **1.5×** headroom | CAPA bootstrap 2 + **Karpenter** (Workload only) |
 
-Reference worker: CAPA/Karpenter **`t3.large`**. Reserved nodes carry `capacity.scke.io/reservation=reserved` and a plane label/taint (`services` / `workload` / `management`). Full write-up: [`aws_eks/services/karpenter/capacity.md`](aws_eks/services/karpenter/capacity.md).
+Full write-up: [`aws_eks/services/karpenter/capacity.md`](aws_eks/services/karpenter/capacity.md) · order: [docs/provisioning-order.md](docs/provisioning-order.md).
 
 ### Capability catalog
 
@@ -261,7 +280,7 @@ Industry language: **GitOps continuous delivery**. Team name: **CI/CD**.
 | Principal + ApplicationController | **Services only** (no Agent on this cluster) |
 | ApplicationSetController | **Off** on Principal |
 | Agent | **Workload only** (cannot co-locate with Principal; independent + report) |
-| Karpenter | **Services plane** (cluster compute for EKS node pools) |
+| Karpenter | **Workload cluster only** |
 | Knative | **Workload plane** |
 | Velero | Workload + Services |
 | Auth to Argo UI | Keycloak OIDC + OAuth2 Proxy (Services) |
@@ -321,21 +340,21 @@ Add more rows here and on the SVG as the platform grows.
 
 | Decision | Choice |
 |----------|--------|
-| Services cluster | EKS with Argo CD Principal + ApplicationController, **Karpenter**, platform peers |
-| Workload cluster | Separate EKS with Argo CD **Agent** (no Principal), Knative, apps |
+| Services cluster | EKS Principal + ApplicationController; CAPA **5 Reserved**; **no Karpenter** |
+| Workload cluster | EKS Agent; **Karpenter only here**; Knative, apps |
 | Workload plane | EKS substrate **including Argo CD Agent, Knative, Velero** |
 | Apply path for apps / peer services | **Argo CD** |
 | On Prem / AWS Services | Vertical side surfaces — not planes; inventory grows over time |
 | Isolation | Dedicated namespaces per capability (and later network policies) |
 | Topology | **Three clusters:** Management + Services EKS + Workload EKS ([docs/clusters.md](docs/clusters.md)) |
-| Capacity | Mgmt **3× m7i.xlarge**; each EKS bootstrap **2** + Karpenter **5 Reserved** + **1.5×** headroom per EKS |
+| Capacity | Mgmt **3× m7i**; Services CAPA **5 Reserved**; Workload bootstrap **2** + Karpenter **5** + headroom |
 
 ### Services plane production bar
 
 | Capability | Production design bar |
 |------------|----------------------|
 | Argo CD (CI/CD) | Principal + ApplicationController on **Services**; Agent on **Workload** (independent); SSO; AppProjects |
-| Karpenter | Services plane; **5+5 Reserved** + **1.5× headroom**; multi-AZ; IRSA + dedicated node role; disruption budgets |
+| Karpenter | **Workload only**; 5 Reserved + 1.5× headroom; IRSA; Services uses CAPA MD × 5 |
 | Knative | Workload plane; quotas, multi-tenant limits, measured eventing scope |
 | Velero | Workload + Services; scheduled backups to S3, immutability, **restore runbooks + drills** |
 | OpenBao | HA, auto-unseal, audit, policies, namespaces |
@@ -391,15 +410,15 @@ Add more rows here and on the SVG as the platform grows.
 
 ## 10. Design principles
 
-1. **Production WAF first** — design and score against high maturity (§1.1); lab work is foundation, not the goal.  
-2. **EKS is the product path** — CAPA → EKS; `aws_ec2` mirrors later.  
-3. **Services plane is first-class** — including CI/CD and Karpenter.  
-4. **Reserved capacity is intentional** — 3 / 5 / 5 + 1.5× headroom is the production floor, not waste to eliminate casually.  
-5. **Management is SUSE Rancher / RKE2** — 3 Reserved nodes; Kind path is not the product.  
-6. **YAML first** — AWS and platform changes come from git.  
-7. **IAM is central for CAPA** — `aws_iam/` only; per-service IRSA/Pod Identity is mandatory for production Services.  
+1. **Production WAF first** — design and score against high maturity (§1.1–1.2).  
+2. **Three clusters** — Management → Services → Workload ([docs/provisioning-order.md](docs/provisioning-order.md)).  
+3. **Turtles/CAPI/CAPA on Management** create Services then Workload EKS.  
+4. **Karpenter only on Workload**; Services capacity is CAPA Reserved MD.  
+5. **Argo:** Principal + ApplicationController on Services; Agent on Workload (no co-location).  
+6. **YAML first** — AWS and platform changes from git.  
+7. **IAM central for CAPA** — `aws_iam/`; IRSA/Pod Identity per service on EKS.  
 8. **No secrets in git**.  
-9. **Measure and gate** — CI validation, budgets, restore drills, pillar re-score after major slices.
+9. **Measure and gate** — CI, budgets, restore drills, re-score after slices.
 
 ---
 
@@ -407,11 +426,12 @@ Add more rows here and on the SVG as the platform grows.
 
 | Doc | Topic |
 |-----|--------|
-| [README.md](README.md) | Repo layout and rules |
-| [aws_eks/README.md](aws_eks/README.md) | EKS path operations |
-| [aws_iam/README.md](aws_iam/README.md) | IAM stacks and deploy order |
-| [docs/architecture.svg](docs/architecture.svg) | System diagram (EKS + services) |
-| [docs/platform-candidates.md](docs/platform-candidates.md) | Candidate backlog: pin AWS / elect OSS / on-prem / eliminate |
+| [docs/clusters.md](docs/clusters.md) | Three-cluster map |
+| [docs/provisioning-order.md](docs/provisioning-order.md) | Apply order 1→2→3 |
+| [docs/wa-scorecard.md](docs/wa-scorecard.md) | WAF score to date |
+| [management/](management/) | Management cluster |
+| [aws_eks/](aws_eks/) | Services + Workload CAPA + platform installs |
+| [docs/platform-candidates.md](docs/platform-candidates.md) | Candidate backlog |
 
 ---
 
@@ -421,14 +441,15 @@ Add more rows here and on the SVG as the platform grows.
 
 **Current phase:** production design for **high WAF score**. Prefer order:
 
-1. Lock production substrate (3 AZ, bootstrap HA, CMK, endpoint, tags) — **in progress in YAML**  
-2. **Management plane** — pins + day-0 IaC in `management/` (**design done**); deploy VPC/DNS/TLS + bootstrap when ready  
-3. **Karpenter** production path — NodePools + Reserved 5/5 + 1.5× headroom (**manifests present**; controller IRSA + discovery tags next)  
-4. **Argo CD** — Principal + ApplicationController (Services), Agent (Workload); design in `aws_eks/services/argocd/` (**done**); install when clusters ready  
-5. Peer services via Argo: secrets (OpenBao+ESO), IdP, Harbor, CNPG, Velero, OTel+LGTM  
-6. IRSA / Pod Identity **per service**; tighten CAPA IAM with conditions  
-7. CI gates (schema, policy, WAF guardrails); budgets; backup **restore drills**  
-8. Full `/wa-review` re-score → close Critical/High until §1.1 targets met  
-9. Then: reshape `aws_ec2/` as a clone of this production operating model  
+1. Lock production substrate — **YAML done** for both CAPA EKS  
+2. **Install Management** (Turtles/CAPI/CAPA) — design done; runtime next  
+3. **CAPA create Services** then **Workload** — defs done  
+4. **Karpenter on Workload only** — manifests; IRSA next  
+5. **Argo** install Principal+AppController / Agent — design done  
+6. Peer services via Argo: secrets, IdP, Harbor, CNPG, Velero, OTel+LGTM  
+7. IRSA per service; CI gates; budgets; restore drills  
+8. Full `/wa-review` re-score → §1.1 targets  
+9. Reshape `aws_ec2/` as clone of this model  
+
 
 Update this file, [docs/architecture.svg](docs/architecture.svg), and [docs/platform-candidates.md](docs/platform-candidates.md) when topology or dispositions change.

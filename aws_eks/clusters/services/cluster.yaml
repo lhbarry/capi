@@ -1,8 +1,10 @@
-# CAPA EKS — Services cluster (platform)
-# Argo CD Principal + ApplicationController, Karpenter (services), platform peers.
-# Managed by CAPA on the Management cluster. Not co-located with Workload Agent.
+# CAPA EKS — Services cluster (platform) — Cluster #2
+# Argo CD Principal + ApplicationController, platform peers.
+# Capacity: CAPA MachineDeployment Reserved floor (NO Karpenter on Services).
+# Created by: Management Turtles/CAPI/CAPA (after Management install; before Workload).
+# Not co-located with Workload Agent.
 #
-# Prerequisites: aws_iam stacks, aws_eks/kms CMK. Keep parent kustomization resources empty until promote.
+# Prerequisites: aws_iam + aws_eks/kms. Keep kustomization resources empty until promote.
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: Cluster
@@ -84,14 +86,20 @@ metadata:
   name: capi-eks-services-md-0
   namespace: default
   labels:
-    capacity.scke.io/role: bootstrap-system
+    capacity.scke.io/reservation: reserved
+    capacity.scke.io/role: services-reserved
     capacity.scke.io/plane: services
 spec:
   clusterName: capi-eks-services
-  replicas: 2
+  # Services Reserved floor via CAPA only (Karpenter is Workload-only).
+  replicas: 5
   selector:
     matchLabels: null
   template:
+    metadata:
+      labels:
+        capacity.scke.io/reservation: reserved
+        capacity.scke.io/plane: services
     spec:
       version: v1.34.1
       bootstrap:
@@ -127,10 +135,10 @@ spec:
         Workload: capi-eks-services
         ManagedBy: capa
         CostCenter: scke
-        Role: bootstrap-system
+        Role: services-reserved
         Phase: production-design
+        capacity.scke.io/reservation: reserved
         capacity.scke.io/plane: services
-        karpenter.sh/discovery: capi-eks-services
 ---
 apiVersion: bootstrap.cluster.x-k8s.io/v1beta2
 kind: NodeadmConfigTemplate

@@ -45,7 +45,8 @@ These are **on the architecture** today. Change them via architecture review, no
 | **AWS Services** | EFS + CSI (RWX), EBS + CSI (HP block), S3 |
 | **On Prem Services** | AD / LDAP, SMTP, MS Teams |
 | **Workload plane** | CAPA EKS substrate, **Argo CD Agent**, **Knative**, **Velero** |
-| **Services plane** | Argo CD Principal/Agent, **Karpenter**, **Velero**, Keycloak, OAuth2 Proxy, Harbor, OpenBao, External Secrets Operator, CloudNativePG, OpenTelemetry, Grafana LGTM |
+| **Services cluster** | Argo Principal + ApplicationController, **Velero**, Keycloak, OAuth2 Proxy, Harbor, OpenBao, ESO, CNPG, OTel, LGTM (**no Karpenter**) |
+| **Workload cluster** | Argo **Agent**, **Karpenter**, Knative, apps, Velero |
 
 ---
 
@@ -132,8 +133,9 @@ Move candidates here with a date and reason. Reopen only with a new need stateme
 | 2026-07-17 | OpenBao, External Secrets | elected-oss | Services plane secrets path |
 | 2026-07-17 | Knative | elected-oss | Workload plane serverless runtime |
 | 2026-07-17 | Velero | elected-oss | Workload + Services; often S3 target |
-| 2026-07-17 | Karpenter | elected-oss | Services plane node autoscaling |
-| 2026-07-20 | Karpenter capacity | elected-oss | Manifests: 5 Reserved services + 5 Reserved workload + 1.5× headroom; mgmt 3 Reserved |
+| 2026-07-17 | Karpenter | elected-oss | (later: Workload-only — see 2026-07-20) |
+| 2026-07-20 | Karpenter | elected-oss | **Workload cluster only**; Services = CAPA MD × 5 |
+| 2026-07-20 | Provisioning order | — | Management → Services CAPA → Workload CAPA (Turtles/CAPI/CAPA) |
 | 2026-07-17 | Argo CD, Keycloak, OAuth2 Proxy, Harbor, CNPG, OTel, LGTM | elected-oss | Services plane (see ARCHITECTURE) |
 | 2026-07-20 | KMS CMK (EKS secrets) | hybrid | CAPA encryptionConfig + `aws_eks/kms`; OpenBao for app secrets |
 | 2026-07-20 | CloudWatch (EKS CP logs) | hybrid | CAPA logging all five; LGTM still target for app telemetry |

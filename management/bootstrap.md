@@ -87,18 +87,29 @@ helm upgrade --install rancher rancher-stable/rancher \
 
 For **Prime**, use Prime chart/registry instructions from SUSE (version pin still **2.14.3** line unless Prime channel dictates a patch).
 
-## Phase 4 — CAPI / CAPA on local
+## Phase 4 — Turtles / CAPI / CAPA on local
 
-See [capa-placement.md](capa-placement.md).
+See [capa-placement.md](capa-placement.md) · [docs/provisioning-order.md](../docs/provisioning-order.md).
 
 ```bash
-# Example — pin provider versions to match your clusterctl book of record
-clusterctl init --infrastructure aws
-# Apply CAPA IAM already from aws_iam/ if not present
-# kubectl apply -f aws_eks/clusters/... when intentionally creating EKS
+# Install Cluster API Operator / Turtles, then CAPI + CAPA (versions per book of record)
+# clusterctl init --infrastructure aws
+# Or Turtles-managed provider install — prefer one path and pin it in git when first applied.
 ```
 
-## Phase 5 — Hardening checklist
+## Phase 5 — CAPA create Services, then Workload
+
+**Order locked: Services before Workload.**
+
+```bash
+# From Management cluster (after IAM + KMS exist):
+# 1) Enable and apply aws_eks/clusters/services/cluster.yaml via CAPA
+# 2) Wait Services Ready
+# 3) Enable and apply aws_eks/clusters/workload/cluster.yaml via CAPA
+# 4) Karpenter + Argo Agent on Workload; Principal on Services
+```
+
+## Phase 6 — Hardening checklist
 
 - [ ] EBS encryption on  
 - [ ] SG: only required RKE2/Rancher ports; no 0.0.0.0/0 to 6443 from internet unless intended  

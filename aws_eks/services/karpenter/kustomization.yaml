@@ -1,12 +1,12 @@
-# Karpenter CRs — apply per target cluster (not a single monocluster).
-# Services cluster: nodeclass-services + reserved-services + elastic + headroom (+ services overprovision)
-# Workload cluster: nodeclass-workload + reserved-workload + elastic (copy with nodeClassRef workload) + workload overprovision
+# Karpenter — Workload cluster ONLY.
+# Do not install Karpenter on Services or Management.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - nodeclass-services.yaml
   - nodeclass-workload.yaml
-  - nodepool-reserved-services.yaml
   - nodepool-reserved-workload.yaml
   - nodepool-elastic.yaml
-  - overprovisioning
+  - overprovisioning/priorityclass.yaml
+  - overprovisioning/reserved-workload.yaml
+  - overprovisioning/headroom.yaml
+# Services reserved capacity is CAPA MD on capi-eks-services (not Karpenter).
