@@ -30,44 +30,32 @@ The management plane runs CAPI/CAPA (and related control tooling) to provision A
 
 **Rule:** Before baking an AMI ID into IaC, open the [RKE2 support matrix](https://www.suse.com/suse-rke2/support-matrix/all-supported-versions/) for the **RKE2 minor** shipped with the chosen Rancher version and confirm the OS row. Also check the [Rancher support matrix](https://www.suse.com/suse-rancher/support-matrix/all-supported-versions/) for that Rancher release.
 
-### Instance sizing (verified against upstream docs, 2026-07-20)
+### Instance sizing — **locked production profile**
 
-Two different floors apply; **do not confuse them**:
+**Accepted node shape (per management node):** **4 vCPU / 16 GiB RAM / 100 GiB gp3 SSD**  
+**Count:** **3** RKE2 server nodes, multi-AZ  
 
-| Layer | Source | Min / recommend |
-|-------|--------|-----------------|
-| **RKE2 only** (Kubernetes underlay) | [RKE2 requirements](https://docs.rke2.io/install/requirements) | Min **2 vCPU / 4 GB**; recommend **≥ 4 vCPU / 8 GB**; **SSD** for etcd |
-| **Rancher on RKE2** (upstream / local cluster) | [Rancher installation requirements — RKE2](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-requirements#rke2-kubernetes) | Production HA **≥ 3 nodes**; **Small = 4 vCPU / 16 GB per node** |
+Aligned with Rancher **Small** RKE2 upstream floor ([install requirements](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-requirements#rke2-kubernetes)): 4 vCPU / **16 GB** RAM. Disk **100 GiB gp3** meets SSD/etcd guidance ([RKE2](https://docs.rke2.io/install/requirements), Rancher disk section).
 
-Rancher official RKE2 upstream table (per node):
-
-| Managed fleet (approx.) | Max clusters | Max nodes | vCPU | RAM |
-|-------------------------|-------------:|----------:|-----:|----:|
-| Small | 150 | 1500 | **4** | **16 GB** |
-| Medium | 300 | 3000 | **8** | **32 GB** |
-| Large | 500 | 5000 | **16** | **64 GB** |
-
-Disk (Rancher): **SSD always**; on cloud use size that unlocks adequate IOPS; consider dedicated etcd volume at scale.
-
-#### Candidate profile review: `4 vCPU / 8 GiB / 100 GiB disk`
-
-| Spec | Verdict | Notes |
-|------|---------|--------|
-| **4 vCPU** | OK for Small | Matches Rancher Small CPU and RKE2 “recommend 4” |
-| **8 GiB RAM** | **Below Rancher Small** | Meets RKE2-only recommend (8 GB); **half** of Rancher Small (**16 GB**). Not production-aligned for Rancher Manager + CAPA |
-| **100 GiB disk** | OK if **SSD (gp3)** | Good root size; Rancher requires SSD for etcd performance |
-
-**Adapted production profile (recommended):**
-
-| Spec | Value | AWS example |
-|------|-------|-------------|
+| Spec | Locked value | AWS notes |
+|------|--------------|-----------|
 | vCPU | **4** | — |
-| RAM | **16 GiB** (not 8) | — |
-| Disk | **100 GiB gp3** SSD (3000+ IOPS baseline) | Root EBS |
-| Instance | `m6i.xlarge` / `m7i.xlarge` / `m5.xlarge` | Prefer **M** over **T** (no credit exhaustion for etcd/Rancher) |
-| Count / AZ | **3** servers, multi-AZ | One per AZ when possible |
+| RAM | **16 GiB** | — |
+| Disk | **100 GiB gp3** SSD | Root EBS; baseline gp3 IOPS |
+| Instance examples | `m7i.xlarge`, `m6i.xlarge`, `m5.xlarge` | Prefer **M** over **T** (no CPU credits for etcd/Rancher) |
+| Topology | **3** nodes, multi-AZ | One node per AZ when possible |
 
-If hardware is hard-capped at **8 GiB**, options are: (a) accept **non-production / very small** Rancher footprint and monitor pressure, or (b) use **K3s** upstream table (still **4 / 16 GB** for Small) — still not 8 GiB. **Do not plan production Rancher HA at 8 GiB/node.**
+**Rejected candidate:** `4 / 8 / 100` — 8 GiB meets RKE2-only recommend but is **below** Rancher Small (16 GB).
+
+Reference Rancher RKE2 upstream table (context only; we lock Small):
+
+| Class | Max clusters | Max nodes | vCPU | RAM |
+|-------|-------------:|----------:|-----:|----:|
+| **Small (ours)** | 150 | 1500 | **4** | **16 GB** |
+| Medium | 300 | 3000 | 8 | 32 GB |
+| Large | 500 | 5000 | 16 | 64 GB |
+
+Scale to Medium/Large only if managed fleet or CAPA load exceeds Small assumptions.
 
 ### Network / HA (production)
 
@@ -107,7 +95,7 @@ Downstream EKS (Services + Workload)
 
 ## Open items
 
-1. Exact **hardware profile** → pick instance type + disk from sizing table  
+1. ~~Hardware profile~~ → **locked 4 / 16 / 100 gp3** (pick exact instance type AMI family at deploy)  
 2. Pin **Rancher version** + matching **RKE2 version** → re-check OS matrix → lock **AMI ID**  
 3. BYOS vs PAYG for SUSE images  
 4. Day-0 bootstrap procedure (Terraform/CFN/Ansible + RKE2 install)  
