@@ -81,7 +81,7 @@ Same diagram as SVG: [docs/architecture.svg](docs/architecture.svg).
 | **On Prem Services** | Side surface (not a plane) | Left margin | **AD / LDAP**, **SMTP**, **MS Teams** — more TBD |
 | **AWS Services** | Side surface (not a plane) | Right margin | **EFS CSI (RWX)**, **EBS CSI (HP block)**, **S3** — more TBD |
 
-**Critical rule:** CAPA provisions **AWS** (EKS, EC2, VPC, …). **Services plane** (including Argo CD Principal) and **Workload plane** (including Argo CD Agent) both sit on EKS. Side rails are integration surfaces, not planes. Management is unspecified until decided.
+**Critical rule:** CAPA (on the **Rancher/RKE2 management cluster**) provisions **AWS** (EKS, EC2, VPC, …). **Services plane** (including Argo CD Principal) and **Workload plane** (including Argo CD Agent) both sit on **downstream EKS**. Side rails are integration surfaces, not planes.
 
 ---
 
