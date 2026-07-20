@@ -53,7 +53,7 @@ Telemetry: OTel agents → gateway → LGTM; CP logs: CloudWatch → OTel → Lo
 | # | Pillar | Severity | Finding | Evidence |
 |---|--------|----------|---------|----------|
 | 1 | OPS | **High** | No automated CI policy gates in git (local validate only); production GitOps promotion path incomplete | `scripts/validate-eks-manifests.sh` only; no `.github/workflows`; Flux `resources: []` intentional but no promote pipeline |
-| 2 | OPS | **High** | Services plane peers mostly design docs, not installable desired state — ops procedures cannot be exercised | Keycloak, Harbor, OpenBao, ESO, CNPG = “future” in inventory; Argo/Velero/LGTM = sketches |
+| 2 | OPS | **High** | Proven GitLab peer packages (vSphere SCKE / Observability) not yet **wired** into Argo on EKS — residual gap is **source map + Application wiring + AWS overlays**, not missing charts | Intent: [gitops-source-reuse.md](gitops-source-reuse.md); this repo has substrate/overlays only; GitLab project map still TBD |
 | 3 | SEC | **High** | Platform secrets path (OpenBao + ESO) and per-service IRSA not implemented beyond Karpenter IRSA template | Inventory “future”; `aws_iam/karpenter-irsa.yaml` only; CAPA OIDC on, roles incomplete |
 | 4 | REL | **High** | Backup/restore and alert pipelines are design-only — no completed Velero drill; LGTM not live so rules cannot fire | `velero/restore-drill.md` log empty; `lgtm/` sketches + alert YAML without running stack |
 | 5 | PERF | **High** | No performance measurement / review process tied to OTel metrics; right-sizing not data-driven yet | Karpenter NodePools present; no SLOs, no PERF runbook, LGTM not deployed |
@@ -83,7 +83,7 @@ Telemetry: OTel agents → gateway → LGTM; CP logs: CloudWatch → OTel → Lo
 | Slice | Pillars lifted | Action |
 |-------|----------------|--------|
 | **A. Live substrate** | OPS, SEC, REL | Deploy detection + CAPA Services/Workload; keep Flux empty until promote gate exists |
-| **B. Platform CD + secrets** | OPS, SEC | Install Argo Principal/Agent; OpenBao + ESO; first IRSA set |
+| **B. Platform CD + secrets** | OPS, SEC | Wire Argo → **GitLab** proven charts; OpenBao + ESO first; AWS overlays + IRSA; fill [gitops-source-reuse.md](gitops-source-reuse.md) map |
 | **C. Observability go-live** | OPS, REL, PERF | OTel agents+gateway + LGTM; wire MS Teams; confirm CP logs in Loki |
 | **D. Prove recoverability** | REL | First Velero drill; log in `restore-drill.md` |
 | **E. Cost + SUS process** | COST, SUS | Deploy budget; tag review; document consolidation/Knative efficiency review |

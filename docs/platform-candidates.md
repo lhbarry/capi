@@ -150,6 +150,7 @@ Move candidates here with a date and reason. Reopen only with a new need stateme
 | 2026-07-20 | Management pins | Rancher **2.14.3**, RKE2 **v1.34.9+rke2r1**, **m7i.xlarge** | management/VERSIONS.md + day-0 CFN |
 | 2026-07-20 | Argo CD topology | Principal + **ApplicationController** on Services; Agent on Workload | No Principal+Agent co-location; **no ApplicationSetController** on Principal |
 | 2026-07-20 | Cluster split | **3 clusters:** Management, Services EKS, Workload EKS | docs/clusters.md; CAPA defs under aws_eks/clusters/{services,workload} |
+| 2026-07-20 | Services peer packages | **reuse GitLab** | Proven charts/values from vSphere SCKE (incl. SCKE:Observability); docs/gitops-source-reuse.md |
 
 ---
 

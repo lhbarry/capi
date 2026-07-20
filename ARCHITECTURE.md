@@ -255,6 +255,8 @@ Industry names are primary; **team names** in parentheses for local vocabulary.
 | **Telemetry collection** (instrumentation pipeline) | Obs. Infra | [OpenTelemetry](https://opentelemetry.io/) | **Agents** (Workload) + **gateway** (Services): traces, metrics, logs → LGTM |
 | **Observability backend** (LGTM stack) | Observability | Grafana · Loki · Tempo · Mimir | Viz + logs + traces + metrics (long-term metrics via Mimir) |
 
+**GitOps sources:** Platform peer packages (charts + proven values) are **reused from GitLab**, proven on **vSphere-hosted SCKE** (including **SCKE:Observability**). This repository owns CAPA/EKS substrate, AWS rail, and **AWS-specific overlays** — not a greenfield rewrite of every chart. See [docs/gitops-source-reuse.md](docs/gitops-source-reuse.md).
+
 ### CI/CD — Argo CD Principal, ApplicationController, Agent
 
 Industry language: **GitOps continuous delivery**. Team name: **CI/CD**.  
@@ -430,6 +432,7 @@ Add more rows here and on the SVG as the platform grows.
 |-----|--------|
 | [docs/clusters.md](docs/clusters.md) | Three-cluster map |
 | [docs/architecture-inventory.md](docs/architecture-inventory.md) | Diagram ↔ WAF service inventory (no invented services) |
+| [docs/gitops-source-reuse.md](docs/gitops-source-reuse.md) | Reuse vSphere SCKE GitLab charts/values on AWS Services plane |
 | [docs/architecture.svg](docs/architecture.svg) | System diagram |
 | [docs/provisioning-order.md](docs/provisioning-order.md) | Apply order 1→2→3 |
 | [docs/wa-scorecard.md](docs/wa-scorecard.md) | WAF score to date |

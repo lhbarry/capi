@@ -50,14 +50,14 @@ Do not add further rail products without an architecture decision and SVG update
 | Argo CD Agent | **Not on Services** — Workload only | — |
 | Karpenter | **Not on Services** — Workload only | — |
 | Velero | Services + Workload | `aws_eks/services/velero/` |
-| Keycloak | Services | (future install tree) |
-| OAuth2 Proxy | Services | (future) |
-| Harbor | Services | (future) |
-| OpenBao | Services — **secrets SoR** | (future) |
-| External Secrets Operator | Services — OpenBao → K8s Secrets only | (future) |
-| CloudNativePG | Services | (future) |
-| **OpenTelemetry** | **Services gateway** + **Workload agents** | `aws_eks/services/lgtm/collectors/` |
-| **Grafana LGTM** (Loki · Tempo · Mimir) | Services | `aws_eks/services/lgtm/` |
+| Keycloak | Services | **Reuse GitLab** (vSphere SCKE) — map in [gitops-source-reuse.md](gitops-source-reuse.md); thin AWS overlay in this repo |
+| OAuth2 Proxy | Services | **Reuse GitLab** (vSphere SCKE) |
+| Harbor | Services | **Reuse GitLab** (vSphere SCKE) |
+| OpenBao | Services — **secrets SoR** | **Reuse GitLab** (vSphere SCKE) |
+| External Secrets Operator | Services — OpenBao → K8s Secrets only | **Reuse GitLab** (vSphere SCKE) |
+| CloudNativePG | Services | **Reuse GitLab** (vSphere SCKE) + EBS CSI |
+| **OpenTelemetry** | **Services gateway** + **Workload agents** | **Reuse GitLab** (SCKE:Observability) + `aws_eks/services/lgtm/collectors/` AWS deltas (CW CP) |
+| **Grafana LGTM** (Loki · Tempo · Mimir) | Services | **Reuse GitLab** (SCKE:Observability) + `aws_eks/services/lgtm/` alerts overlays |
 
 ### Workload plane
 
@@ -71,6 +71,13 @@ Do not add further rail products without an architecture decision and SVG update
 | **OpenTelemetry agents** | Daemon/agents ship OTLP → Services OTel gateway |
 
 ---
+
+## GitOps source model (locked)
+
+**Installable desired state for Services peers is primarily in GitLab**, proven on **vSphere-hosted SCKE** (including **SCKE:Observability**). Chart version pins and proven values are reused on AWS EKS via Argo CD.
+
+This repo supplies **substrate + AWS overlays + topology**, not a full rewrite of every platform chart.  
+Details and mapping table: **[gitops-source-reuse.md](gitops-source-reuse.md)**.
 
 ## Secrets management (locked)
 
