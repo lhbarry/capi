@@ -2,11 +2,11 @@
 
 **Telemetry agents (only):** [OpenTelemetry](https://opentelemetry.io/) — diagram **DATA & OBSERVABILITY**.  
 - **Workload:** OTel Collector **agents** (DaemonSet / node) ship OTLP  
-- **Services:** OTel Collector **gateway** receives OTLP (+ optional CP-log receiver) → LGTM  
+- **Services:** OTel Collector **gateway** receives OTLP + **EKS CP logs from CloudWatch** → LGTM  
 
 **Backend (only):** Grafana LGTM — Loki · Tempo · Mimir (diagram).
 
-**Not in catalog:** Fluent Bit or any other shipper. Do not introduce them.
+**Not in catalog:** any shipper other than OpenTelemetry.
 
 ```text
 Workload cluster                         Services cluster
@@ -20,6 +20,9 @@ Workload cluster                         Services cluster
                                         │        └─► Grafana (UI+alert)│
 Management (optional OTel) ──OTLP──────►│                             │
                                         └─────────────────────────────┘
+                                                    ▲
+AWS rail: CloudWatch (CP Logs Only) ────────────────┘
+  (awscloudwatchlogs receiver on gateway)
 ```
 
 ## Signal map (catalog §7)
@@ -27,21 +30,30 @@ Management (optional OTel) ──OTLP──────►│                   
 | Signal | Collector | Backend |
 |--------|-----------|---------|
 | Metrics | OpenTelemetry | **Mimir** → Grafana |
-| Logs | OpenTelemetry | **Loki** → Grafana |
+| App / node logs | OpenTelemetry | **Loki** → Grafana |
 | Traces | OpenTelemetry | **Tempo** → Grafana |
+| **EKS control-plane logs** | **CloudWatch (CP Logs Only)** → OTel gateway | **Loki** → Grafana |
 | Alerts | — | Grafana / Mimir ruler → Alertmanager |
 
-## EKS control-plane logs (AWS constraint)
+## EKS control-plane logs — investigation result
 
-CAPA `logging:` enables EKS control-plane log delivery. **AWS only accepts CloudWatch Logs as that delivery target** — that is an AWS API constraint, **not** a diagram “AWS Services” product choice and **not** a new architecture box.
+| Question | Answer |
+|----------|--------|
+| Can EKS CP logs go somewhere other than CloudWatch first? | **No.** AWS delivers managed EKS control-plane logs **only** to **CloudWatch Logs** (`/aws/eks/<cluster>/cluster`). CAPA `logging:` enables that path. |
+| Can OpenTelemetry collect those CP logs? | **Yes.** OTel Collector **contrib** provides the **`awscloudwatchlogs` receiver**, which polls CloudWatch Logs groups and injects them into the collector pipeline (export to Loki). |
+| Day-2 operator UI? | **Grafana / Loki** — not the CloudWatch console. Rail label is **CloudWatch · CP Logs Only**. |
 
-**Architecture path:** OpenTelemetry Collector (with AWS CloudWatch Logs **receiver** in the collector config) reads those groups and exports to **Loki**. Day-2 operators use **Grafana**, not the CloudWatch console.
+**Architecture path:**
 
-No extra shippers. No Firehose/Lambda as architecture components unless the owner adds them to the catalog **and** the SVG AWS rail (or Services plane) explicitly.
+```text
+CAPA logging: on  →  CloudWatch Logs (CP only)  →  OTel gateway (awscloudwatchlogs)  →  Loki
+```
+
+Sketch: [`collectors/otel-gateway-sketch.yaml`](collectors/otel-gateway-sketch.yaml).  
+Gateway needs IRSA with `logs:FilterLogEvents` / `logs:DescribeLogGroups` (and related read APIs) on the `/aws/eks/*` groups.
 
 ## Out of scope for this stack
 
 - CloudWatch Alarms / Container Insights as primary REL monitoring  
 - Any log/metrics agent other than **OpenTelemetry**  
-- New AWS rail products beyond **EFS · EBS · S3**  
-
+- Firehose / Lambda bridges unless explicitly added to the catalog later  

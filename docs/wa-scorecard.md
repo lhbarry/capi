@@ -59,9 +59,9 @@ Calibration: **4.1 design** with backup, restore procedure, HA topology, alarms,
 
 ## Security ≥ 4.0 — evidence (summary)
 
-**Diagram-aligned:** private EKS API, CMK secrets, encrypted volumes, Karpenter IRSA, PSS, NetworkPolicies; observability via **OpenTelemetry → LGTM** (not CW ops).
+**Diagram-aligned:** private EKS API, CMK secrets, encrypted volumes, Karpenter IRSA, PSS, NetworkPolicies; **OpenBao + ESO** secrets; observability via **OpenTelemetry → LGTM**.
 
-**Account controls (not AWS rail boxes):** CloudTrail→**S3**, GuardDuty, Config under `aws_security/` — use diagram **S3** for trail storage; not added to SVG AWS column. Owner may re-scope.
+**AWS rail (SEC):** CloudTrail → S3, GuardDuty, Config (`aws_security/`); CloudWatch **CP Logs Only** → OTel → Loki.
 
 ---
 

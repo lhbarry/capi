@@ -7,11 +7,18 @@ Matches **ARCHITECTURE.md §7** and `docs/architecture.svg`:
 | **OpenTelemetry** · Collector · OTLP | Telemetry collection (Obs. Infra) |
 | **Grafana LGTM** · Loki · Tempo · Mimir | Observability backend |
 
+## Related AWS rail (not LGTM install)
+
+| Rail service | Role with this stack |
+|--------------|----------------------|
+| **CloudWatch · CP Logs Only** | EKS CP log delivery; OTel gateway `awscloudwatchlogs` receiver → Loki |
+
 ## Not in architecture
 
 - Any telemetry agent other than **OpenTelemetry**  
-- CloudWatch as day-2 ops UI or primary alerting  
-- New AWS rail products beyond **EFS · EBS · S3**  
+- CloudWatch as day-2 ops UI or primary alerting (CP log sink only)  
+- AWS Secrets Manager (secrets = OpenBao + ESO)  
+
 
 
 ## Layout

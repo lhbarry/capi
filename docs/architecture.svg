@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1160" width="1240" height="1160" role="img" aria-labelledby="title desc">
   <title id="title">SCKE Transformative Architecture</title>
-  <desc id="desc">SCKE Transformative Architecture — Arch. adaptation from On-Prem to AWS Cloud Services Hosting. CAPA provisions EKS; Services plane includes Argo CD, Velero; Karpenter on Workload; OTel + LGTM, secrets, identity, data, observability.</desc>
+  <desc id="desc">SCKE Transformative Architecture — Arch. adaptation from On-Prem to AWS Cloud Services Hosting. CAPA provisions EKS; Services plane Argo/OTel/LGTM/OpenBao; Workload Karpenter; AWS rail EFS EBS S3 CloudWatch-CP CloudTrail GuardDuty Config.</desc>
 
   <defs>
     <marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -83,22 +83,40 @@
   <rect x="1136" y="220" width="88" height="16" fill="#e0f2fe"/>
   <text x="1180" y="192" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#0369a1">AWS</text>
   <text x="1180" y="208" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#0369a1">Services</text>
-  <text transform="translate(1148, 560) rotate(-90)" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#bae6fd" letter-spacing="0.12em">AWS</text>
+  <text transform="translate(1148, 620) rotate(-90)" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#bae6fd" letter-spacing="0.12em">AWS</text>
 
-  <rect x="1144" y="250" width="72" height="72" rx="8" fill="#f0f9ff" stroke="#7dd3fc"/>
-  <text x="1180" y="274" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#0c4a6e">EFS · CSI</text>
-  <text x="1180" y="290" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#0369a1">RWX</text>
-  <text x="1180" y="306" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#64748b">shared FS</text>
+  <!-- Storage -->
+  <rect x="1144" y="246" width="72" height="58" rx="8" fill="#f0f9ff" stroke="#7dd3fc"/>
+  <text x="1180" y="266" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#0c4a6e">EFS · CSI</text>
+  <text x="1180" y="282" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#0369a1">RWX shared</text>
+  <text x="1180" y="296" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#64748b">FS</text>
 
-  <rect x="1144" y="334" width="72" height="80" rx="8" fill="#f0f9ff" stroke="#7dd3fc"/>
-  <text x="1180" y="358" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#0c4a6e">EBS · CSI</text>
-  <text x="1180" y="374" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#0369a1">HP block</text>
-  <text x="1180" y="390" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#64748b">storage</text>
-  <text x="1180" y="404" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#64748b">RWO</text>
+  <rect x="1144" y="312" width="72" height="58" rx="8" fill="#f0f9ff" stroke="#7dd3fc"/>
+  <text x="1180" y="332" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#0c4a6e">EBS · CSI</text>
+  <text x="1180" y="348" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#0369a1">HP block</text>
+  <text x="1180" y="362" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#64748b">RWO</text>
 
-  <rect x="1144" y="426" width="72" height="56" rx="8" fill="#f0f9ff" stroke="#7dd3fc"/>
-  <text x="1180" y="452" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#0c4a6e">S3</text>
-  <text x="1180" y="468" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#64748b">object store</text>
+  <rect x="1144" y="378" width="72" height="50" rx="8" fill="#f0f9ff" stroke="#7dd3fc"/>
+  <text x="1180" y="400" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#0c4a6e">S3</text>
+  <text x="1180" y="416" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#64748b">object store</text>
+
+  <!-- Observability / detection (account + CP) -->
+  <rect x="1144" y="440" width="72" height="64" rx="8" fill="#f0f9ff" stroke="#7dd3fc"/>
+  <text x="1180" y="460" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#0c4a6e">CloudWatch</text>
+  <text x="1180" y="476" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" font-weight="700" fill="#0369a1">CP Logs Only</text>
+  <text x="1180" y="492" text-anchor="middle" font-family="system-ui, sans-serif" font-size="7" fill="#64748b">EKS → OTel</text>
+
+  <rect x="1144" y="512" width="72" height="50" rx="8" fill="#f0f9ff" stroke="#7dd3fc"/>
+  <text x="1180" y="534" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#0c4a6e">CloudTrail</text>
+  <text x="1180" y="550" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#64748b">API audit → S3</text>
+
+  <rect x="1144" y="570" width="72" height="50" rx="8" fill="#f0f9ff" stroke="#7dd3fc"/>
+  <text x="1180" y="592" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#0c4a6e">GuardDuty</text>
+  <text x="1180" y="608" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#64748b">threat detect</text>
+
+  <rect x="1144" y="628" width="72" height="50" rx="8" fill="#f0f9ff" stroke="#7dd3fc"/>
+  <text x="1180" y="650" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#0c4a6e">Config</text>
+  <text x="1180" y="666" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#64748b">compliance</text>
 
   <text x="1180" y="1080" text-anchor="middle" font-family="system-ui, sans-serif" font-size="8" fill="#7dd3fc">+ more…</text>
 
@@ -183,7 +201,7 @@
 
   <rect x="626" y="680" width="474" height="48" rx="8" fill="#fef3c7" stroke="#fcd34d"/>
   <text x="642" y="700" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#92400e">External Secrets Operator</text>
-  <text x="642" y="716" font-family="system-ui, sans-serif" font-size="10" fill="#78350f">OpenBao / AWS SM → K8s Secrets</text>
+  <text x="642" y="716" font-family="system-ui, sans-serif" font-size="10" fill="#78350f">OpenBao → K8s Secrets via ESO</text>
 
   <text x="136" y="748" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#6b7280" letter-spacing="0.03em">DATA &amp; OBSERVABILITY</text>
 
@@ -236,7 +254,7 @@
 
   <rect x="136" y="1048" width="964" height="56" rx="8" fill="#faf5ff" stroke="#ddd6fe"/>
   <text x="618" y="1070" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#5b21b6">Stack order: Services → Workload · Argo · Karpenter (WL) · Knative · Velero · OpenBao←ESO · OTel→LGTM</text>
-  <text x="618" y="1088" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#94a3b8">Side rails: On Prem (AD/LDAP · SMTP · MS Teams) · AWS (EFS · EBS · S3) — not planes</text>
+  <text x="618" y="1088" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#94a3b8">Side rails: On Prem (AD/LDAP · SMTP · MS Teams) · AWS (EFS · EBS · S3 · CloudWatch CP · CloudTrail · GuardDuty · Config)</text>
 
   <text x="620" y="1140" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#94a3b8">Three clusters: management/ · services · workload · ARCHITECTURE.md §7</text>
 </svg>

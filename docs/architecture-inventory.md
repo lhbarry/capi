@@ -15,15 +15,19 @@
 | SMTP | On-prem mail |
 | MS Teams | On-prem notify |
 
-### AWS Services (right rail) — **only these**
+### AWS Services (right rail) — catalog
 
-| Label | Catalog / notes |
-|-------|-----------------|
+| Label | Role |
+|-------|------|
 | EFS · CSI (RWX) | Shared FS |
 | EBS · CSI (HP block) | RWO volumes |
-| S3 | Object store (Velero, artifacts; account trail buckets *use* S3) |
+| S3 | Object store (Velero, artifacts, CloudTrail/Config delivery) |
+| **CloudWatch · CP Logs Only** | EKS control-plane log delivery target only; not day-2 ops UI |
+| **CloudTrail** | API audit → S3 (`aws_security/detection.yaml`) |
+| **GuardDuty** | Threat detection |
+| **Config** | Configuration compliance → S3 |
 
-**Do not add** CloudWatch, GuardDuty, Config, Firehose, Lambda, X-Ray, etc. to this rail without an explicit architecture decision and SVG update.
+Do not add further rail products without an architecture decision and SVG update.
 
 ### Management
 
@@ -49,8 +53,8 @@
 | Keycloak | Services | (future install tree) |
 | OAuth2 Proxy | Services | (future) |
 | Harbor | Services | (future) |
-| OpenBao | Services | (future) |
-| External Secrets Operator | Services | (future) |
+| OpenBao | Services — **secrets SoR** | (future) |
+| External Secrets Operator | Services — OpenBao → K8s Secrets only | (future) |
 | CloudNativePG | Services | (future) |
 | **OpenTelemetry** | **Services gateway** + **Workload agents** | `aws_eks/services/lgtm/collectors/` |
 | **Grafana LGTM** (Loki · Tempo · Mimir) | Services | `aws_eks/services/lgtm/` |
@@ -68,61 +72,60 @@
 
 ---
 
-## Explicitly **not** architecture (diagram) services
+## Secrets management (locked)
 
-| Item | Origin | How WAF / docs treat it |
-|------|--------|-------------------------|
-| **Fluent Bit** | **Never in your architecture.** Introduced by error in an LGTM rewrite (commit `3605f2f` era); removed | **Do not cite.** Telemetry agent = **OpenTelemetry only** |
-| CloudWatch Alarms / Container Insights | REL package experiment | **Removed.** Alerts = **Grafana/Mimir** (`lgtm/alerts/`) |
-| CloudWatch as day-2 ops UI | Assumed AWS default | **Not used.** Operators use **Grafana** |
-| CloudWatch Logs (EKS CP delivery) | **AWS API constraint** for CAPA `logging:` | **Not** an AWS-rail product box. OTel collector **receives** those groups and exports to **Loki**. Do not promote CW to the diagram rail |
-| CloudTrail / GuardDuty / Config CFN | SEC package (`aws_security/`) | **Account controls**, not Services-plane apps and **not** new AWS rail boxes. Trail storage uses diagram **S3**. Owner may scope these in/out of WAFR |
+| Component | Role |
+|-----------|------|
+| **OpenBao** | System of record for secrets |
+| **External Secrets Operator** | Syncs OpenBao → Kubernetes `Secret`s |
+
+**AWS Secrets Manager is not in the architecture** for platform or app secrets. Do not cite it in WAF evidence as a secrets backend.
+
+*(CAPA controller IAM may still reference AWS Secrets Manager ARNs for cluster bootstrap secrets — that is CAPA platform plumbing, not the Secrets capability on the Services plane.)*
+
+---
+
+## Explicitly **not** architecture services
+
+| Item | How WAF / docs treat it |
+|------|-------------------------|
+| Fluent Bit / other shippers | Not catalogued. Telemetry agent = **OpenTelemetry only** |
+| CloudWatch Alarms / Container Insights | Not baseline. Alerts = **Grafana/Mimir** |
+| CloudWatch as day-2 ops UI | **Not used.** Scope = **CP Logs Only** on the rail |
+| AWS Secrets Manager (app/platform secrets) | **Removed.** OpenBao + ESO only |
+
+---
+
+## EKS CP logs path (investigated)
+
+1. **AWS constraint:** EKS control-plane logging delivers **only** to **CloudWatch Logs** (`/aws/eks/<cluster>/cluster`). There is no alternate first hop for managed EKS CP logs.  
+2. **OTel can collect them:** OpenTelemetry Collector **contrib** includes the **`awscloudwatchlogs` receiver**, which polls CloudWatch Logs groups and feeds the collector pipeline.  
+3. **Architecture path:** CAPA enables CP log types → **CloudWatch (CP Logs Only)** → **OTel gateway** (`awscloudwatchlogs` receiver) → **Loki** (LGTM).  
+4. Day-2 operators query **Grafana/Loki**, not the CloudWatch console for cluster ops.
+
+Evidence sketch: `aws_eks/services/lgtm/collectors/otel-gateway-sketch.yaml`.
 
 ---
 
 ## WAF evaluation rule (mandatory)
 
-When scoring any pillar:
-
-1. **Telemetry / agents:** cite **OpenTelemetry** (agents on Workload, gateway on Services) → **Grafana LGTM**.  
-2. **Backup:** cite **Velero** + diagram **S3**.  
-3. **CD / compute / identity / secrets / data / registry:** only catalog names (Argo, Karpenter, Keycloak, …).  
-4. **AWS rail:** only **EFS · EBS · S3**. If a need has no catalog replacement, **ask** — do not invent rail services.  
-5. Never introduce Fluent Bit, Firehose, Lambda, X-Ray, or CW Alarms as architecture dependencies.
+1. **Telemetry:** OpenTelemetry (agents Workload, gateway Services) → Grafana LGTM.  
+2. **CP logs:** CloudWatch (CP Logs Only) + OTel pull → Loki.  
+3. **Detection:** CloudTrail · GuardDuty · Config (AWS rail) + S3 storage.  
+4. **Secrets:** OpenBao + ESO only.  
+5. **Backup:** Velero + S3.  
+6. Do not invent rail products or alternate secrets backends.
 
 ---
 
-## Fidelity matrix (diagram service → WAF evidence)
+## Fidelity matrix (diagram → evidence)
 
-| Diagram service | WAF / design evidence | Status |
-|-----------------|----------------------|--------|
-| OpenTelemetry | `aws_eks/services/lgtm/collectors/` (gateway + workload agent sketches); ARCHITECTURE §7 | Aligned |
+| Diagram service | Evidence | Status |
+|-----------------|----------|--------|
+| OpenTelemetry | `aws_eks/services/lgtm/collectors/` | Aligned |
 | Grafana LGTM | `aws_eks/services/lgtm/` + `alerts/` | Aligned |
-| Argo Principal / AppController / Agent | `aws_eks/services/argocd/` | Aligned |
-| Karpenter (Workload only) | `aws_eks/services/karpenter/` | Aligned |
-| Velero | `aws_eks/services/velero/` | Aligned |
-| EFS / EBS / S3 | ARCHITECTURE side surfaces; Velero BSL → S3 | Aligned (rail only) |
-| Keycloak / OAuth2 / Harbor / OpenBao / ESO / CNPG / Knative | Catalog + diagram; install trees future | Catalog-aligned (no invented substitutes) |
-
----
-
-## Inconsistencies closed this pass
-
-| Issue | Resolution |
-|-------|------------|
-| Fluent Bit assumed as log agent | **You never catalogued it.** Agent error. Removed; OTel only |
-| OTel agents under-emphasized in WAF/REL | Agents + gateway called out in SVG, §7, collectors/, inventory |
-| SVG Agent “also Services” | Fixed → **Workload only** |
-| SVG OTel “Collector · OTLP” only | Fixed → **Agents + gateway · OTLP → LGTM** |
-| Capacity checklist: Karpenter on Services | Fixed → CAPA 5 Services / Karpenter Workload only |
-| AWS rail inventions | Rule: EFS · EBS · S3 only; ask before adding |
-
----
-
-## Open owner decisions (not invented)
-
-| Topic | Question for owner |
-|-------|--------------------|
-| Account detection (CloudTrail / GuardDuty / Config) | Keep as **non-diagram account controls** in SEC evidence, or drop from WAFR scope? |
-| EKS CP log path | Accept **AWS-required intermediate** + OTel→Loki (current design), or disable CAPA CP logging entirely? |
-| AWS SM on ESO box | Diagram already shows “OpenBao / AWS SM → K8s Secrets” — keep hybrid wording or OpenBao-only? |
+| CloudWatch CP Logs Only | CAPA `logging:`; OTel `awscloudwatchlogs` | Aligned |
+| CloudTrail / GuardDuty / Config | `aws_security/detection.yaml` | Aligned (now on rail) |
+| OpenBao + ESO | Catalog + diagram | Aligned (no AWS SM) |
+| Argo / Karpenter / Velero | respective trees | Aligned |
+| EFS / EBS / S3 | side surfaces | Aligned |

@@ -18,12 +18,15 @@ data:
             endpoint: 0.0.0.0:4317
           http:
             endpoint: 0.0.0.0:4318
-      # EKS control-plane logs: AWS delivers only to CloudWatch Logs.
-      # Use OTel contrib receiver to pull CP log groups into the architecture pipeline.
-      awscloudwatchlogs:
+      # EKS CP logs: AWS rail CloudWatch (CP Logs Only) is the only first hop.
+      # OTel contrib receiver CAN collect them from CW log groups → Loki.
+      # Requires IRSA: logs:DescribeLogGroups, logs:FilterLogEvents, …
+      awscloudwatchlogs/services:
         region: us-east-2
         log_group_name: /aws/eks/capi-eks-services/cluster
-        # Add workload cluster log group as second receiver instance or shared config
+      awscloudwatchlogs/workload:
+        region: us-east-2
+        log_group_name: /aws/eks/capi-eks-workload/cluster
     processors:
       batch: {}
       memory_limiter:
@@ -45,7 +48,7 @@ data:
           processors: [memory_limiter, batch]
           exporters: [prometheusremotewrite]
         logs:
-          receivers: [otlp, awscloudwatchlogs]
+          receivers: [otlp, awscloudwatchlogs/services, awscloudwatchlogs/workload]
           processors: [memory_limiter, batch]
           exporters: [loki]
         traces:

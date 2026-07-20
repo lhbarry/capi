@@ -19,7 +19,7 @@ For every candidate:
 | **Elect OSS** | Run (or keep) an open-source component, usually on the **Services plane** | Add to Services plane catalog + diagram |
 | **On-prem** | Depends on corporate / existing on-prem systems | Add to **On Prem Services** side rail |
 | **Eliminate** | Explicitly out of scope, deferred, or covered by another choice | Move to **Eliminated / deferred** with one-line rationale |
-| **Hybrid** | AWS *and* OSS (or on-prem) with a clear boundary | Document both sides and the integration (e.g. OpenBao + ESO + AWS SM) |
+| **Hybrid** | AWS *and* OSS (or on-prem) with a clear boundary | Document both sides and the integration (e.g. CloudWatch CP → OTel → Loki) |
 
 3. **Record the decision** in the tables below (status → decided date + choice).
 4. **Propagate** — update `docs/architecture.svg`, `ARCHITECTURE.md` § side surfaces / Services catalog, and `README.md` services table if user-facing.
@@ -42,7 +42,7 @@ These are **on the architecture** today. Change them via architecture review, no
 
 | Surface | Committed |
 |---------|-----------|
-| **AWS Services** | EFS + CSI (RWX), EBS + CSI (HP block), S3 |
+| **AWS Services** | EFS + CSI, EBS + CSI, S3, **CloudWatch (CP Logs Only)**, **CloudTrail**, **GuardDuty**, **Config** |
 | **On Prem Services** | AD / LDAP, SMTP, MS Teams |
 | **Workload plane** | CAPA EKS substrate, **Argo CD Agent**, **Knative**, **Velero** |
 | **Services cluster** | Argo Principal + ApplicationController, **Velero**, Keycloak, OAuth2 Proxy, Harbor, OpenBao, ESO, CNPG, OTel, LGTM (**no Karpenter**) |
@@ -59,8 +59,9 @@ Common next AWS (or AWS-adjacent) capabilities. Default question: **pin AWS**, *
 | DNS | Route 53 | ExternalDNS + external DNS; CoreDNS only in-cluster | `candidate` | |
 | Public TLS certificates | ACM | cert-manager + public CA / Let’s Encrypt | `candidate` | |
 | Encryption keys / CMKs | KMS | OpenBao transit; limited substitute for AWS data-plane keys | `hybrid` | **2026-07-20:** KMS CMK for EKS secrets (`aws_eks/kms` + CAPA `encryptionConfig`); OpenBao remains app secrets SoR |
-| Managed secrets (cloud) | Secrets Manager / SSM Parameter Store | OpenBao + External Secrets | `candidate` | ESO can multi-store; prefer one SoR story |
-| Cloud metrics/logs (AWS native) | CloudWatch (not on diagram rail) | **OpenTelemetry** agents + gateway → **LGTM** | `hybrid` | Catalog = OTel+LGTM only. EKS CP logs: AWS delivery constraint then **OTel→Loki**. No CW Alarms baseline. |
+| Managed secrets (cloud) | Secrets Manager / SSM | OpenBao + External Secrets | `eliminated` | **2026-07-20:** OpenBao + ESO only; no AWS Secrets Manager in architecture |
+| Cloud metrics/logs (AWS native) | **CloudWatch · CP Logs Only** (rail) | **OpenTelemetry** agents + gateway → **LGTM** | `hybrid` | CP logs: CAPA → CW → OTel `awscloudwatchlogs` → Loki. Day-2 = LGTM. No CW Alarms baseline. |
+| API audit / threat / config | CloudTrail, GuardDuty, Config | — | `pinned-aws` | **2026-07-20:** on AWS Services rail; templates in `aws_security/` |
 | Container registry (AWS) | ECR | Harbor (committed OSS) pull-through to ECR | `candidate` | Likely **hybrid** if Harbor proxies ECR |
 | L4/L7 load balancing | NLB / ALB (+ AWS LB Controller) | MetalLB / ingress-nginx only (limited on EKS) | `candidate` | EKS almost always pins AWS LBs |
 | Private service access | VPC endpoints / PrivateLink | NAT only (cost/ops tradeoff) | `candidate` | |
@@ -119,7 +120,8 @@ Move candidates here with a date and reason. Reopen only with a new need stateme
 
 | Capability | Former status | Date | Rationale |
 |------------|---------------|------|-----------|
-| — | — | — | — |
+| AWS Secrets Manager / SSM as app secrets | candidate | 2026-07-20 | OpenBao + ESO cleanly cover secrets management |
+| CloudWatch Alarms / Container Insights (baseline) | hybrid/experiment | 2026-07-20 | Alerts via Mimir/Grafana; CW rail scope = CP Logs Only |
 
 ---
 
@@ -138,7 +140,9 @@ Move candidates here with a date and reason. Reopen only with a new need stateme
 | 2026-07-20 | Provisioning order | — | Management → Services CAPA → Workload CAPA (Turtles/CAPI/CAPA) |
 | 2026-07-17 | Argo CD, Keycloak, OAuth2 Proxy, Harbor, CNPG, OTel, LGTM | elected-oss | Services plane (see ARCHITECTURE) |
 | 2026-07-20 | KMS CMK (EKS secrets) | hybrid | CAPA encryptionConfig + `aws_eks/kms`; OpenBao for app secrets |
-| 2026-07-20 | CloudWatch (EKS CP logs) | hybrid | AWS-only CP sink; **LGTM primary** for ops/alerts |
+| 2026-07-20 | CloudWatch (EKS CP logs) | pinned-aws (scoped) | On rail as **CP Logs Only**; OTel pulls → Loki; LGTM primary for ops |
+| 2026-07-20 | CloudTrail, GuardDuty, Config | pinned-aws | On AWS Services rail; `aws_security/detection.yaml` |
+| 2026-07-20 | AWS Secrets Manager (app secrets) | eliminated | OpenBao + ESO only |
 | 2026-07-20 | CloudWatch Alarms / Container Insights | eliminated (baseline) | Replaced by Mimir/Grafana rules under aws_eks/services/lgtm/alerts |
 | 2026-07-20 | IRSA foundation | candidate (partial) | OIDC associated on CAPA EKS; per-service roles later |
 | 2026-07-20 | Management plane host | **SUSE Rancher / RKE2** | ADR-001; 3 Reserved; 4/16/100 gp3 |

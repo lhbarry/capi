@@ -73,12 +73,12 @@ Score reflects **in-repo production design + evidence**, not fully deployed live
 ## 2. High-level topology
 
 ```text
-  ┌ On Prem ────┐     Git · management/ · aws_eks/ · aws_iam/     ┌ AWS Services ─┐
-  │ AD/LDAP     │                                                   │ EFS · EBS · S3 │
+  ┌ On Prem ────┐     Git · management/ · aws_eks/ · aws_iam/     ┌ AWS Services ──────────┐
+  │ AD/LDAP     │                                                   │ EFS · EBS · S3          │
   │ SMTP        │     1. Management (Rancher/RKE2 + Turtles/CAPI/CAPA)
-  │ MS Teams    │              │
-  └─────────────┘              ├── 2. CAPA → Services EKS (no Karpenter)
-                               └── 3. CAPA → Workload EKS (Karpenter only here)
+  │ MS Teams    │              │                                    │ CloudWatch (CP Logs Only)
+  └─────────────┘              ├── 2. CAPA → Services EKS           │ CloudTrail · GuardDuty  │
+                               └── 3. CAPA → Workload EKS           │ Config                  │
 ```
 
 **Three clusters:** [docs/clusters.md](docs/clusters.md).  
@@ -93,7 +93,7 @@ Score reflects **in-repo production design + evidence**, not fully deployed live
 | **Identity bootstrap** | Plane | AWS IAM CFN | CAPA controllers + EKS roles + node profiles |
 | **Services** | **Cluster #2** | EKS `capi-eks-services` | Principal + ApplicationController; **CAPA 5 Reserved** (no Karpenter) |
 | **Workload** | **Cluster #3** | EKS `capi-eks-workload` | Agent; **Karpenter** (5 Reserved + headroom); apps |
-| **On Prem / AWS Services** | Side surfaces | Margins | AD/LDAP, SMTP, Teams · EFS/EBS/S3 |
+| **On Prem / AWS Services** | Side surfaces | Margins | AD/LDAP, SMTP, Teams · EFS/EBS/S3 · CloudWatch (CP Logs Only) · CloudTrail · GuardDuty · Config |
 
 **Critical rules:** (1) Provision **1 → 2 → 3**. (2) **Karpenter on Workload only**. (3) Argo Principal never co-locates with Agent.
 
@@ -155,7 +155,7 @@ Management product is **SUSE Rancher / RKE2** ([ADR-001](docs/adr/001-management
 
 Details: [`aws_iam/README.md`](aws_iam/README.md).
 
-Services plane will need **additional** identities (IRSA / Pod Identity, Harbor robot accounts, Keycloak clients, DB credentials via secrets manager, etc.) — out of CAPA IAM scope; document as those land.
+Services plane will need **additional** identities (IRSA / Pod Identity, Harbor robot accounts, Keycloak clients, DB credentials via **OpenBao** + ESO, etc.) — out of CAPA IAM scope; document as those land.
 
 ---
 
@@ -251,7 +251,7 @@ Industry names are primary; **team names** in parentheses for local vocabulary.
 | **AuthN/AuthZ proxy** (identity-aware reverse proxy) | Auth/Auth | [OAuth2 Proxy](https://oauth2-proxy.github.io/oauth2-proxy/) | Protect UIs/APIs; OIDC login; forward identity headers |
 | **Identity provider (IdP)** / SSO & federation | ID Federation | [Keycloak](https://www.keycloak.org/) | Users, realms, OIDC/SAML federation, client registration |
 | **Secrets management** (secrets store) | Secrets | [OpenBao](https://openbao.org/) | Central secrets engine (Vault-compatible lineage); dynamic secrets, policies |
-| **Secrets synchronization** (K8s secret injection) | Secrets | [External Secrets Operator](https://external-secrets.io/) | Syncs external backends (OpenBao, AWS SM, etc.) → Kubernetes `Secret`s |
+| **Secrets synchronization** (K8s secret injection) | Secrets | [External Secrets Operator](https://external-secrets.io/) | Syncs **OpenBao** → Kubernetes `Secret`s (sole secrets path; no AWS Secrets Manager) |
 | **Telemetry collection** (instrumentation pipeline) | Obs. Infra | [OpenTelemetry](https://opentelemetry.io/) | **Agents** (Workload) + **gateway** (Services): traces, metrics, logs → LGTM |
 | **Observability backend** (LGTM stack) | Observability | Grafana · Loki · Tempo · Mimir | Viz + logs + traces + metrics (long-term metrics via Mimir) |
 
@@ -300,7 +300,7 @@ Industry language: **GitOps continuous delivery**. Team name: **CI/CD**.
                       UI ◄── OAuth2 Proxy ◄── Keycloak
              Karpenter ──► EC2 · Velero · OpenBao ◄── ESO
              CI ──► Harbor · CNPG · OTel ──► LGTM
-  Side surfaces:   On Prem · AWS (EFS/EBS/S3)
+  Side surfaces:   On Prem · AWS (EFS/EBS/S3 · CW-CP · Trail · GD · Config)
 ```
 
 | Flow | Components |
@@ -311,7 +311,7 @@ Industry language: **GitOps continuous delivery**. Team name: **CI/CD**.
 | Serverless / scale-to-zero | **Knative** on Workload plane |
 | Backup / restore | **Velero** on Workload + Services (snapshots / object storage, often **S3**) |
 | Login to operator UIs | Keycloak + OAuth2 Proxy (incl. Argo CD UI) |
-| Secrets | **OpenBao** holds secrets; **External Secrets Operator** materializes them as K8s `Secret`s (can also pull AWS SM/SSM later) |
+| Secrets | **OpenBao** is system of record; **External Secrets Operator** materializes OpenBao → K8s `Secret`s only |
 | Image supply chain | CI → Harbor; nodes pull from Harbor |
 | Stateful data | CloudNativePG-managed Postgres; **EBS CSI** (RWO block), **EFS CSI** (RWX), **S3** object |
 | Directory / identity federation | **AD / LDAP** (on-prem) → Keycloak (Services) where applicable |
@@ -328,7 +328,11 @@ Not planes — integration / dependency lists on the diagram margins.
 | **On Prem Services** | **MS Teams** | Chat / webhook notifications for ops and apps |
 | **AWS Services** | **EFS + CSI (RWX)** | Shared filesystem for multi-attach / RWX workloads |
 | **AWS Services** | **EBS + CSI (HP block)** | High-performance block volumes (typically RWO) |
-| **AWS Services** | **S3** | Object storage (backups, artifacts, static assets, etc.) |
+| **AWS Services** | **S3** | Object storage (Velero, artifacts, CloudTrail/Config delivery) |
+| **AWS Services** | **CloudWatch** · **CP Logs Only** | Mandatory EKS control-plane log sink; **not** day-2 ops UI. OTel gateway reads log groups → Loki |
+| **AWS Services** | **CloudTrail** | Multi-region API audit trail → **S3** (`aws_security/detection.yaml`) |
+| **AWS Services** | **GuardDuty** | Threat detection (account detector) |
+| **AWS Services** | **Config** | Configuration recorder + rules → **S3** |
 
 Add more rows here and on the SVG as the platform grows.
 
@@ -356,7 +360,7 @@ Add more rows here and on the SVG as the platform grows.
 | Knative | Workload plane; quotas, multi-tenant limits, measured eventing scope |
 | Velero | Workload + Services; scheduled backups to S3, immutability, **restore runbooks + drills** |
 | OpenBao | HA, auto-unseal, audit, policies, namespaces |
-| External Secrets Operator | Least privilege; OpenBao (+ AWS SM if hybrid); refresh policies |
+| External Secrets Operator | Least privilege; **OpenBao only** as backend; refresh policies |
 | CloudNativePG | Multi-AZ, PITR, encryption, quotas |
 | Harbor | HA, signing/policies, pull-through |
 | OAuth2 Proxy | Consistent edge auth for operator UIs |
@@ -379,7 +383,7 @@ Add more rows here and on the SVG as the platform grows.
 | Bootstrap workers | ≥2 multi-AZ system nodes | YAML → 2 |
 | App/platform capacity | Services: CAPA **5 Reserved** (no Karpenter). Workload: Karpenter **5 Reserved + 1.5× headroom** | CAPA MD + `services/karpenter` |
 | EKS API access | Private preferred; public only with tight CIDR until mgmt in-VPC | Explicit in YAML |
-| Control-plane logs | CAPA on; **OpenTelemetry → Loki**; SIEM optional from S3/Loki | Designed |
+| Control-plane logs | CAPA → **CloudWatch (CP Logs Only)** → **OTel → Loki**; SIEM optional from S3/Loki | Designed |
 | Secrets encryption | CMK (`aws_eks/kms`) | YAML + template |
 | Node access | SSM only; no bastion / no standing SSH | YAML + IAM policy |
 | Pod identity | IRSA or EKS Pod Identity **per service** | OIDC on; per-service open |
