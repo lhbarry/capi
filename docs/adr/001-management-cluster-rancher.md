@@ -12,23 +12,27 @@ The management plane runs CAPI/CAPA (and related control tooling) to provision A
 
 | Layer | Choice |
 |-------|--------|
-| **Software** | **SUSE Rancher** (Rancher Manager) as the management-plane control UI/API and multi-cluster manager |
+| **Software** | **SUSE Rancher** (Rancher Manager / **Prime** support already in place) |
 | **Kubernetes under Rancher** | **RKE2** HA **upstream** cluster — **3 server nodes** (etcd + control plane; odd number for quorum) |
 | **Node count** | **3 Reserved** (matches capacity model) |
+| **OS** | **Ubuntu — latest stable release** (LTS track for production) |
+| **Node shape** | **4 vCPU / 16 GiB / 100 GiB gp3** |
 | **Placement** | AWS EC2, **multi-AZ** (one node per AZ preferred) |
-| **Not chosen** | Kind (lab only); bare CAPA-on-EKS without Rancher; self-managed kubeadm without Rancher |
+| **Not chosen** | Kind (lab only); bare CAPA-on-EKS without Rancher; SLE Micro / SLES as mgmt OS |
 
-### AMI / OS (recommended default — confirm against support matrix at pin time)
+### AMI / OS — **locked**
 
-| Rank | OS / AMI source | When to use |
-|-----:|-----------------|-------------|
-| **1 (default)** | **SLE Micro** (SUSE Linux Enterprise Micro) — AWS Marketplace / SUSE public cloud AMI, x86_64, HVM, EBS | Best alignment with **SUSE Rancher + RKE2** support and SUSE commercial support path; immutable OS fit for control-plane nodes |
-| **2** | **SLES 15 SP** (latest SP on RKE2 matrix) — SUSE AMI | Prefer if you need full SLES tooling vs Micro’s immutable model |
-| **3** | **Ubuntu 24.04 LTS** — official Canonical AWS AMI | On-prem parity; only if the **exact** RKE2 + Rancher versions you pin list 24.04 as supported |
-| **4 (fallback)** | **Ubuntu 22.04 LTS** — Canonical AMI | If 24.04 is missing from the matrix for your pin |
-| **Avoid for mgmt** | Amazon Linux 2 / 2023 as primary Rancher/RKE2 OS | Weaker first-class support history for RKE2; not SUSE’s validated path |
+| Field | Decision |
+|-------|----------|
+| **OS family** | **Ubuntu** |
+| **Release policy** | **Latest stable release** — for production use the current **LTS** from Canonical (server track). As of 2026-07 that is **Ubuntu 24.04 LTS**; when a newer LTS becomes current stable, migrate only after RKE2 matrix certification. |
+| **AMI source** | **Official Canonical** Ubuntu Server AMI (free; no mandatory OS license). Do **not** use third-party “Ubuntu + support” Marketplace images unless explicitly approved. |
+| **Rejected OS** | **SLE Micro**, SLES (as mgmt host OS) — optional later only if requirements change; not the design default |
+| **Also avoid** | Amazon Linux 2 / 2023 as primary RKE2/Rancher OS |
 
-**Rule:** Before baking an AMI ID into IaC, open the [RKE2 support matrix](https://www.suse.com/suse-rke2/support-matrix/all-supported-versions/) for the **RKE2 minor** shipped with the chosen Rancher version and confirm the OS row. Also check the [Rancher support matrix](https://www.suse.com/suse-rancher/support-matrix/all-supported-versions/) for that Rancher release.
+**Rule:** Before baking an AMI ID into IaC, confirm the chosen Ubuntu LTS appears on the [RKE2 support matrix](https://www.suse.com/suse-rke2/support-matrix/all-supported-versions/) for the **RKE2 minor** used with the pinned Rancher version. Re-check when bumping Ubuntu LTS or RKE2.
+
+**Security process (Ubuntu):** golden AMI / rebuild nodes (minimize hand `apt` drift); keep AppArmor enabled; SSM over SSH; EBS encryption; planned reboot window for kernel security updates. Rancher **Prime** covers Rancher stack; OS security lifecycle is Canonical/Ubuntu (optional Ubuntu Pro for expanded maintenance).
 
 ### Instance sizing — **locked production profile**
 
@@ -84,22 +88,25 @@ Downstream EKS (Services + Workload)
 | Kind on a laptop/VM | Lab only; fails production REL/OPS |
 | EKS as management cluster without Rancher | Valid AWS-native path; **rejected** — org chose **SUSE Rancher** as software layer |
 | K3s for Rancher | Acceptable for small; **RKE2 preferred** for production HA Rancher |
-| Ubuntu-only because on-prem is 24.04 | Fine as rank 3 if matrix allows; **SLE Micro** preferred for SUSE stack support on AWS |
+| **SLE Micro** as mgmt OS | Strong immutable defaults; **rejected** for this design — Ubuntu latest stable chosen (on-prem parity, no OS license fee, team familiarity). Rancher **Prime** already covers Rancher support without requiring Micro. |
+| SLES as mgmt OS | Same as Micro for commercial SUSE OS path; not selected |
 
 ## Consequences
 
-- Management AMI and instance type become **first-class production parameters** (document AMI ID / SSM parameter once chosen).
-- SUSE subscription / Marketplace product choice (BYOS vs PAYG) must be settled for SLE Micro/SLES.
+- **OS = Ubuntu latest stable (LTS track)**; pin concrete AMI ID (region) at deploy; no SUSE OS PAYG/BYOS for management nodes.
+- **Rancher Prime** remains the commercial support path for Rancher; OS support is Canonical (optional Ubuntu Pro).
+- Node shape **4/16/100 gp3** × 3 multi-AZ is locked with Ubuntu.
 - CAPA credentials and Rancher cloud credentials for AWS need a production IAM design (next slices).
-- Experimental `clusters/capi-mgmt` remains historical; production mgmt lives under a new tree (e.g. `management/`).
+- Experimental `clusters/capi-mgmt` remains historical; production mgmt lives under `management/`.
 
 ## Open items
 
-1. ~~Hardware profile~~ → **locked 4 / 16 / 100 gp3** (pick exact instance type AMI family at deploy)  
-2. Pin **Rancher version** + matching **RKE2 version** → re-check OS matrix → lock **AMI ID**  
-3. BYOS vs PAYG for SUSE images  
-4. Day-0 bootstrap procedure (Terraform/CFN/Ansible + RKE2 install)  
-5. Where CAPI/CAPA install lands relative to Rancher (local cluster apps)
+1. ~~Hardware profile~~ → **locked 4 / 16 / 100 gp3**  
+2. ~~OS family~~ → **Ubuntu latest stable (LTS)**  
+3. Pin **Rancher version** + matching **RKE2 version** → re-check Ubuntu LTS on matrix → lock **region AMI ID**  
+4. Exact instance type (`m7i.xlarge` vs `m6i.xlarge`, etc.)  
+5. Day-0 bootstrap procedure (Terraform/CFN/Ansible + RKE2 install on Ubuntu)  
+6. Where CAPI/CAPA install lands relative to Rancher (local cluster apps)
 
 ## References
 

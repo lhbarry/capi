@@ -138,7 +138,8 @@ Move candidates here with a date and reason. Reopen only with a new need stateme
 | 2026-07-20 | KMS CMK (EKS secrets) | hybrid | CAPA encryptionConfig + `aws_eks/kms`; OpenBao for app secrets |
 | 2026-07-20 | CloudWatch (EKS CP logs) | hybrid | CAPA logging all five; LGTM still target for app telemetry |
 | 2026-07-20 | IRSA foundation | candidate (partial) | OIDC associated on CAPA EKS; per-service roles later |
-| 2026-07-20 | Management plane host | **SUSE Rancher / RKE2** | ADR-001; 3 Reserved; AMI prefer SLE Micro |
+| 2026-07-20 | Management plane host | **SUSE Rancher / RKE2** | ADR-001; 3 Reserved; 4/16/100 gp3 |
+| 2026-07-20 | Management OS | **Ubuntu latest stable (LTS)** | Canonical AMI; not SLE Micro; re-check RKE2 matrix on LTS bump |
 
 ---
 

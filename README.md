@@ -12,7 +12,7 @@ Arch. adaptation from On-Prem to AWS Cloud Services Hosting — **Cluster API + 
   <img src="docs/architecture.svg" alt="SCKE Transformative Architecture — click for full SVG" width="720" />
 </a>
 
-**Management:** **SUSE Rancher** on **RKE2**, **3 × (4 vCPU / 16 GiB / 100 GiB gp3)** ([ADR-001](docs/adr/001-management-cluster-rancher.md) · [`management/`](management/)). Experimental `clusters/capi-mgmt` (Kind) is not production.
+**Management:** **SUSE Rancher** on **RKE2** / **Ubuntu latest stable LTS**, **3 × (4 vCPU / 16 GiB / 100 GiB gp3)** ([ADR-001](docs/adr/001-management-cluster-rancher.md) · [`management/`](management/)). Experimental `clusters/capi-mgmt` (Kind) is not production.
 
 ## Primary path: EKS + Services plane (production)
 

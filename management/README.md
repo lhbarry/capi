@@ -4,48 +4,45 @@
 
 | Item | Value |
 |------|--------|
-| Software | **SUSE Rancher** on **RKE2** |
-| Nodes | **3 Reserved** (all RKE2 **server** nodes for etcd quorum) |
+| Software | **SUSE Rancher** on **RKE2** (**Prime** support in place) |
+| Nodes | **3 Reserved** (all RKE2 **server** nodes) |
+| **OS** | **Ubuntu — latest stable release** (LTS track; currently **24.04 LTS**) |
+| **AMI** | Official **Canonical** Ubuntu Server (no OS license fee) |
 | **Node shape** | **4 vCPU / 16 GiB RAM / 100 GiB gp3 SSD** |
 | Cloud | AWS EC2, multi-AZ |
 | Instance examples | `m7i.xlarge`, `m6i.xlarge`, `m5.xlarge` |
 | Labels | `capacity.scke.io/reservation=reserved`, `capacity.scke.io/plane=management` |
 
-## AMI recommendation (summary)
+## OS policy
 
-| Preference | AMI / OS |
-|------------|----------|
-| **Default** | **SLE Micro** (SUSE public cloud / Marketplace) x86_64 HVM |
-| Alt SUSE | SLES 15 SP (matrix-current SP) |
-| On-prem parity | Ubuntu **24.04** LTS Canonical AMI **if** matrix-certified for pinned RKE2 |
-| Fallback | Ubuntu **22.04** LTS |
-| Avoid | Amazon Linux as primary RKE2/Rancher OS |
+1. Track **Ubuntu latest stable** for production as the current **LTS** (not interim non-LTS).  
+2. At image bake / deploy, resolve the **Canonical AMI ID** for that LTS in the target region.  
+3. Confirm the LTS version is listed on the [RKE2 support matrix](https://www.suse.com/suse-rke2/support-matrix/all-supported-versions/) for the pinned RKE2 minor.  
+4. When Canonical ships a **new LTS**, do not auto-jump until matrix + test pass.
 
-Re-validate OS against the RKE2 support matrix for the **exact** RKE2 minor used by the pinned Rancher version before locking an AMI ID.
+**Not used for mgmt:** SLE Micro, SLES, Amazon Linux (as primary RKE2 OS).
 
 ## Sizing — locked
 
-| Spec | Value | Source |
-|------|--------|--------|
-| Nodes | **3** | Production HA / etcd quorum |
-| vCPU | **4** | Rancher Small RKE2 upstream |
-| RAM | **16 GiB** | Rancher Small (not 8 GiB) |
-| Disk | **100 GiB gp3** SSD | SSD required for etcd; size for IOPS |
-| Avoid | `t3`/`t3a` | CPU credits vs etcd/Rancher |
-
-Official: [Rancher install requirements](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-requirements#rke2-kubernetes) · [RKE2 requirements](https://docs.rke2.io/install/requirements)
+| Spec | Value |
+|------|--------|
+| Nodes | **3** |
+| vCPU | **4** |
+| RAM | **16 GiB** |
+| Disk | **100 GiB gp3** SSD |
+| Avoid | `t3`/`t3a` |
 
 ## Layout (to grow)
 
 | Path | Purpose |
 |------|---------|
 | `README.md` | This file |
-| (future) `rke2/` | Node config, install notes |
+| (future) `rke2/` | Node config, install notes (Ubuntu) |
 | (future) `rancher/` | Helm values / app install |
-| (future) `infra/` | VPC, NLB, ASG/EC2, IAM (YAML/CFN) |
+| (future) `infra/` | VPC, NLB, EC2, IAM (YAML/CFN) |
 
 ## Relation to rest of repo
 
-- **Downstream clusters:** CAPA → EKS in `aws_eks/` (Services + Workload)  
+- **Downstream clusters:** CAPA → EKS in `aws_eks/` (Services + Workload; AL2023 workers)  
 - **Lab Kind path:** `clusters/capi-mgmt/` — historical only  
 - **Capacity model:** `aws_eks/services/karpenter/capacity.md` (mgmt 3 Reserved)  
