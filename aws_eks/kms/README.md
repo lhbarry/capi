@@ -1,4 +1,4 @@
-# EKS secrets CMK (lab)
+# EKS secrets CMK (production design)
 
 CloudFormation for a customer-managed KMS key used by CAPA:
 
@@ -8,9 +8,9 @@ encryptionConfig:
   resources: [secrets]
 ```
 
-## Deploy (only when leaving pure-dev / ready for AWS)
+## Deploy (production environment)
 
-Not wired to Flux. Apply with AWS CLI when you intentionally create cloud resources:
+Not wired to Flux. Apply with AWS CLI before cluster create:
 
 ```bash
 export AWS_REGION="${AWS_REGION:-us-east-2}"
@@ -26,5 +26,4 @@ aws cloudformation deploy \
 ## Notes
 
 - Alias prefix `cluster-api-provider-aws-*` matches `aws_iam/eks.yaml` KMS grant conditions.
-- Key rotation enabled; 7-day pending window on delete (lab-friendly).
-- Do not deploy from a “no AWS yet” session.
+- Key rotation enabled; pending window on delete is short for operational flexibility — tighten for long-lived prod keys if policy requires.
