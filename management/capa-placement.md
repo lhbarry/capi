@@ -48,8 +48,9 @@
 | Workload | Why not |
 |----------|---------|
 | Application pods | Blast radius; capacity reserved for control plane |
-| Karpenter for EKS nodes | Runs on **downstream** Services plane |
-| Argo CD Principal (design) | Services plane on EKS |
+| Karpenter | **Workload cluster only** (not Services, not Management) |
+| Argo CD Principal + ApplicationController | **Services cluster only** |
+| Argo CD Agent | **Workload cluster only** |
 | Longhorn for app storage | Prefer not on etcd nodes unless dedicated disks + design review |
 
 ## Labels

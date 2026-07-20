@@ -1,36 +1,28 @@
-# LGTM observability stack (Services cluster)
+# Grafana LGTM + OpenTelemetry (diagram services)
 
-**Canonical observability backend** for the platform: **Grafana · Loki · Tempo · Mimir** (plus OpenTelemetry collectors).
+Matches **ARCHITECTURE.md §7** and `docs/architecture.svg`:
 
-| Signal | Path |
-|--------|------|
-| Metrics | kube-state-metrics / node / app OTel → **Mimir** → Grafana |
-| Logs | apps + system → OTel/Fluent Bit → **Loki** → Grafana |
-| Traces | apps → OTel → **Tempo** → Grafana |
-| Alerts | **Mimir / Grafana** alert rules → Alertmanager → SNS/Teams/email |
+| Diagram label | Role |
+|---------------|------|
+| **OpenTelemetry** · Collector · OTLP | Telemetry collection (Obs. Infra) |
+| **Grafana LGTM** · Loki · Tempo · Mimir | Observability backend |
 
-## CloudWatch policy (LGTM-first)
+## Not in architecture
 
-| AWS feature | Keep? | Why |
-|-------------|-------|-----|
-| EKS CAPA `logging:` (api/audit/…) | **Yes (bridge only)** | AWS only delivers EKS **control-plane** logs to **CloudWatch Logs** |
-| CloudWatch Alarms / Container Insights for app REL | **No** | Use **LGTM alerts** instead |
-| CloudTrail → CloudWatch Logs | **No** | CloudTrail → **S3** (detection); optional later ship S3→Loki |
-| SSM AMI parameter paths | N/A | Not observability |
-
-**Bridge:** Fluent Bit / OTel Collector on Services (and agents on Workload) with `awscloudwatch` / subscription filter → **Loki**. Operators use **Grafana**, not the CloudWatch console, for day-2.
+- **Fluent Bit** (never catalogued — do not use as baseline)  
+- CloudWatch as day-2 ops UI or primary alerting  
 
 ## Layout
 
 | Path | Purpose |
 |------|---------|
-| [architecture.md](architecture.md) | Data paths, multi-cluster scrape |
-| [alerts/](alerts/) | Prometheus/Grafana-style alert rules (Mimir/Grafana) |
-| [collectors/](collectors/) | OTel / Fluent Bit sketches |
-| [values-sketch.md](values-sketch.md) | Helm install notes (Grafana k8s-monitoring or kube-prometheus + LGTM) |
+| [architecture.md](architecture.md) | OTel → LGTM paths |
+| [alerts/](alerts/) | Mimir/Grafana rules (replace CW alarms) |
+| [collectors/](collectors/) | **OpenTelemetry** Collector sketches only |
+| [values-sketch.md](values-sketch.md) | Install notes |
 
 ## Install target
 
-- **Services cluster** hosts LGTM backends (HA later).  
-- **Workload** runs lightweight collectors shipping to Services (or regional gateway).  
-- Auth: Grafana behind OAuth2 Proxy + Keycloak.
+- **Services cluster:** LGTM backends + OTel gateway  
+- **Workload cluster:** OTel agents/collectors shipping OTLP to Services  
+- Grafana UI: OAuth2 Proxy + Keycloak (diagram identity path)  

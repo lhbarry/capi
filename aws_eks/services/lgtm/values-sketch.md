@@ -1,20 +1,13 @@
-# Install sketch (Services)
+# Install sketch (Services) — diagram services only
 
-Preferred: **Grafana k8s-monitoring** Helm chart or **Loki + Mimir + Tempo + Grafana** charts in `observability` namespace.
+| Diagram component | Install approach |
+|-------------------|------------------|
+| **Grafana LGTM** (Loki · Tempo · Mimir) | Grafana Helm charts / k8s-monitoring **with OTel**, or separate L/G/T/M charts |
+| **OpenTelemetry** Collector · OTLP | OpenTelemetry Operator + Collector CR, or contrib Helm chart |
 
-## Minimum components
+Collectors are **OpenTelemetry only** (gateway on Services, agents on Workload).
 
-| Component | Role |
-|-----------|------|
-| Grafana | UI + alert routing |
-| Mimir (or Prometheus + remote write) | Metrics |
-| Loki | Logs |
-| Tempo | Traces |
-| Alloy / OTel / Fluent Bit | Collectors |
-| kube-state-metrics + node-exporter | Cluster/node metrics for LGTM alerts |
+## Alerting
 
-## Alert routing
-
-Grafana Alertmanager → SNS / MS Teams / email (on-prem Teams already in architecture).
-
-**Do not** create CloudWatch Alarms for the same conditions (duplicate paging).
+Grafana Alertmanager / Mimir ruler using rules under `alerts/`.  
+Route to MS Teams (on-prem diagram) / email — not CloudWatch Alarms.

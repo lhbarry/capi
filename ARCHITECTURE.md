@@ -205,7 +205,7 @@ Karpenter (per cluster)
 | Region | kustomize param `AWS_REGION` | Per environment |
 | Node / bastion SSH | empty; bastion off | SSM only (WAF SEC) |
 | Public API CIDR | kustomize `PUBLIC_API_CIDR` | Tight allowlist; prefer private-only when mgmt in-VPC |
-| CP logging | all five enabled (AWS → CW sink) → **bridge to Loki** | LGTM primary ops; CW not day-2 UI |
+| CP logging | CAPA enables EKS CP logs (AWS native sink); **OpenTelemetry** ships into **Loki** | Diagram: OTel + LGTM |
 | Secrets encryption | CMK `alias/cluster-api-provider-aws-eks-secrets` | Encryption at rest (WAF SEC) |
 | OIDC | `associateOIDCProvider: true` | IRSA / Pod Identity foundation |
 | Cost tags | Project / Environment / CostCenter / … | Attribution (WAF COST) |
@@ -307,7 +307,7 @@ Industry language: **GitOps continuous delivery**. Team name: **CI/CD**.
 |------|------------|
 | Deploy Services apps | Git → Principal + ApplicationController on **Services** |
 | Deploy Workload apps | Git/intent → **Agent** on Workload (local apply; reports to Principal) |
-| Node capacity | **Karpenter** on Services plane: **5 Reserved** services + **5 Reserved** workload + **1.5× worker** waiting headroom; mgmt **3 Reserved** on management cluster |
+| Node capacity | Mgmt **3**; Services CAPA **5 Reserved** (no Karpenter); Workload **Karpenter** 5 Reserved + **1.5×** headroom |
 | Serverless / scale-to-zero | **Knative** on Workload plane |
 | Backup / restore | **Velero** on Workload + Services (snapshots / object storage, often **S3**) |
 | Login to operator UIs | Keycloak + OAuth2 Proxy (incl. Argo CD UI) |
@@ -315,7 +315,7 @@ Industry language: **GitOps continuous delivery**. Team name: **CI/CD**.
 | Image supply chain | CI → Harbor; nodes pull from Harbor |
 | Stateful data | CloudNativePG-managed Postgres; **EBS CSI** (RWO block), **EFS CSI** (RWX), **S3** object |
 | Directory / identity federation | **AD / LDAP** (on-prem) → Keycloak (Services) where applicable |
-| Signals | OTel Collector → Mimir / Loki / Tempo → Grafana |
+| Signals | **OpenTelemetry** Collector (only agent) → **Grafana LGTM** (Loki · Tempo · Mimir) — no Fluent Bit |
 
 ### Side surface catalogs (growing)
 
@@ -379,11 +379,11 @@ Add more rows here and on the SVG as the platform grows.
 | Bootstrap workers | ≥2 multi-AZ system nodes | YAML → 2 |
 | App/platform capacity | Karpenter **5 Reserved services + 5 Reserved workload + 1.5× headroom** | Manifests in `services/karpenter` |
 | EKS API access | Private preferred; public only with tight CIDR until mgmt in-VPC | Explicit in YAML |
-| Control-plane logs | CAPA all five on; **Loki** via bridge; SIEM optional from S3/Loki | Designed |
+| Control-plane logs | CAPA on; **OpenTelemetry → Loki**; SIEM optional from S3/Loki | Designed |
 | Secrets encryption | CMK (`aws_eks/kms`) | YAML + template |
 | Node access | SSM only; no bastion / no standing SSH | YAML + IAM policy |
 | Pod identity | IRSA or EKS Pod Identity **per service** | OIDC on; per-service open |
-| Observability | OTel + LGTM production HA/retention; CP logs on | Design |
+| Observability | **OpenTelemetry** + **Grafana LGTM** (diagram); HA/retention at install | Design |
 | IAM controllers | Tag/condition scope + access reviews | CAPA-wide today; tighten later |
 | Cost | Tags + budgets; consolidation on elastic only | Tags + `aws_cost/` template |
 | DR | Backup/restore first; multi-region only if required | Velero design |
@@ -425,6 +425,8 @@ Add more rows here and on the SVG as the platform grows.
 | Doc | Topic |
 |-----|--------|
 | [docs/clusters.md](docs/clusters.md) | Three-cluster map |
+| [docs/architecture-inventory.md](docs/architecture-inventory.md) | Diagram ↔ WAF service inventory (no invented services) |
+| [docs/architecture.svg](docs/architecture.svg) | System diagram |
 | [docs/provisioning-order.md](docs/provisioning-order.md) | Apply order 1→2→3 |
 | [docs/wa-scorecard.md](docs/wa-scorecard.md) | WAF score to date |
 | [docs/reliability.md](docs/reliability.md) | RTO/RPO, failure modes, REL controls |

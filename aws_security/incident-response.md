@@ -8,8 +8,8 @@ Lightweight IR process for production. Expand with contacts and tooling as you g
 |-------|----------|
 | CloudTrail | `aws_security/detection.yaml` → **S3** (CMK) |
 | GuardDuty | Same stack |
-| EKS CP / app logs | CAPA CP logging → CW (AWS sink) → **Loki**; apps → **Loki** via OTel/Fluent Bit |
-| Metrics / alerts | **Mimir + Grafana** alert rules (`aws_eks/services/lgtm/alerts/`) |
+| EKS CP / app logs | **OpenTelemetry** → **Loki** (CP: OTel reads AWS-delivered CP logs into Loki) |
+| Metrics / alerts | **Mimir + Grafana** (`aws_eks/services/lgtm/alerts/`) |
 | Cluster snapshots | Velero + EKS managed etcd |
 
 ## Detect

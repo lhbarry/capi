@@ -1,6 +1,8 @@
 # Security baseline (production design)
 
-Controls that raise the **Security** pillar toward WA ≥ 4.0. **Not Flux-wired** — deploy with AWS CLI when leaving design-only mode.
+Controls that raise the **Security** pillar toward WA ≥ 4.0. **Not Flux-wired.**
+
+**Scope note:** Detection templates here are **account-level** (CloudTrail→**S3**, GuardDuty, Config). They are **not** additions to the architecture diagram’s AWS Services rail (EFS · EBS · S3 only). Trail storage uses diagram **S3**. Observability remains **OpenTelemetry + LGTM** on the Services plane.
 
 | Stack / path | Purpose | Pillar BP themes |
 |--------------|---------|------------------|
@@ -41,6 +43,6 @@ Management (Turtles/CAPA) **must** reach private EKS endpoints (same VPC, peerin
 | Audit trail | CloudTrail → **S3 (CMK)** only (optional later ship to **Loki**) |
 | Threat findings | GuardDuty |
 | Config drift | AWS Config recorder |
-| Cluster / app ops | **LGTM** (Grafana/Loki/Tempo/Mimir) — see `aws_eks/services/lgtm/` |
-| EKS CP logs | CAPA enables AWS CP logging (CW is AWS-only sink) → **bridge to Loki** |
+| Cluster / app ops | **OpenTelemetry** + **Grafana LGTM** (diagram) — `aws_eks/services/lgtm/` |
+| EKS CP logs | CAPA enables CP logging; **OpenTelemetry Collector** exports to **Loki** (no Fluent Bit) |
 | Response | [`incident-response.md`](incident-response.md) |

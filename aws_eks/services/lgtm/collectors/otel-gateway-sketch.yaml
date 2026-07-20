@@ -1,4 +1,4 @@
-# OpenTelemetry Collector Gateway — Services cluster (sketch)
+# OpenTelemetry Collector Gateway — Services cluster (diagram: OpenTelemetry)
 # Receives OTLP from Workload + local; exports metrics→Mimir, logs→Loki, traces→Tempo.
 apiVersion: v1
 kind: ConfigMap
@@ -7,9 +7,10 @@ metadata:
   namespace: observability
   labels:
     scke.io/observability: lgtm
+    scke.io/architecture-component: opentelemetry
 data:
   relay.yaml: |
-    # Illustrative — replace with real Collector CR/Helm values at install
+    # Illustrative OTel Collector config — install via OTel Operator / Helm at deploy time
     receivers:
       otlp:
         protocols:
@@ -17,6 +18,12 @@ data:
             endpoint: 0.0.0.0:4317
           http:
             endpoint: 0.0.0.0:4318
+      # EKS control-plane logs: AWS delivers only to CloudWatch Logs.
+      # Use OTel contrib receiver (not Fluent Bit) to pull into the architecture pipeline.
+      awscloudwatchlogs:
+        region: us-east-2
+        log_group_name: /aws/eks/capi-eks-services/cluster
+        # Add workload cluster log group as second receiver instance or shared config
     processors:
       batch: {}
       memory_limiter:
@@ -38,7 +45,7 @@ data:
           processors: [memory_limiter, batch]
           exporters: [prometheusremotewrite]
         logs:
-          receivers: [otlp]
+          receivers: [otlp, awscloudwatchlogs]
           processors: [memory_limiter, batch]
           exporters: [loki]
         traces:

@@ -1,0 +1,52 @@
+# OpenTelemetry Collector Agent — Workload cluster (diagram: OpenTelemetry)
+# Ships metrics/logs/traces via OTLP to Services OTel gateway → LGTM.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-agent-workload-config-sketch
+  namespace: observability
+  labels:
+    scke.io/observability: lgtm
+    scke.io/architecture-component: opentelemetry
+    capacity.scke.io/plane: workload
+data:
+  agent.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+      # hostmetrics / k8scluster / filelog as needed — all OTel, no Fluent Bit
+      hostmetrics:
+        scrapers:
+          cpu: {}
+          memory: {}
+          filesystem: {}
+    processors:
+      batch: {}
+      resource:
+        attributes:
+          - key: cluster
+            value: capi-eks-workload
+            action: upsert
+    exporters:
+      otlp:
+        endpoint: otel-gateway.observability.svc.services.example:4317
+        tls:
+          insecure: true
+    service:
+      pipelines:
+        metrics:
+          receivers: [otlp, hostmetrics]
+          processors: [resource, batch]
+          exporters: [otlp]
+        logs:
+          receivers: [otlp]
+          processors: [resource, batch]
+          exporters: [otlp]
+        traces:
+          receivers: [otlp]
+          processors: [resource, batch]
+          exporters: [otlp]

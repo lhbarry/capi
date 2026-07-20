@@ -40,7 +40,7 @@
 | **Change management** | Git desired state; provision order Management → Services → Workload | Designed |
 | **Backup** | Velero schedules Services + Workload; BSL to S3; volume snapshots weekly | Designed |
 | **Recovery** | RTO/RPO table; [restore-drill.md](../aws_eks/services/velero/restore-drill.md); Management etcd + Rancher backup notes | Designed |
-| **Monitoring / alarms** | **LGTM** Mimir/Grafana rules (`aws_eks/services/lgtm/alerts/`) — not CloudWatch Alarms | Designed |
+| **Monitoring / alarms** | **OpenTelemetry** + **Grafana LGTM** rules (`aws_eks/services/lgtm/`) — diagram services only | Designed |
 | **HA workload placement** | Argo PDBs; topology guidance; multi-AZ CAPA | Designed |
 | **Quotas** | Service quota watchlist | Designed |
 
