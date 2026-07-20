@@ -378,10 +378,12 @@ Prefer order:
 1. Work **[platform-candidates.md](docs/platform-candidates.md)** — disposition candidates before drawing new boxes  
 2. Decide **management plane** (host + how CAPA is run) — keep the box empty until then  
 3. Harden EKS substrate (endpoint, logging, encryption, worker capacity for services)  
+   - **Done (YAML, 2026-07-20):** endpoint allowlist, CP logging, secrets CMK alias, OIDC, tags, no SSH / SSM policy on node role  
+   - **Open:** worker capacity for services, deploy CMK/budget when leaving pure-dev, private-only API when mgmt in-VPC  
 4. Land **Services plane**, starting with **CI/CD** (Argo CD Principal + Agent on EKS)  
 5. Land peer services via Argo (secrets, IdP, Harbor, CNPG, OTel, LGTM, …)  
 6. CI validation of CAPA + services manifests; CI → Harbor image flow  
-7. IRSA / Pod Identity for each service  
+7. IRSA / Pod Identity for each service (OIDC already associated on CAPA EKS)  
 8. Then: reshape `aws_ec2/` as a clone of this operating model  
 
 Update this file, [docs/architecture.svg](docs/architecture.svg), and [docs/platform-candidates.md](docs/platform-candidates.md) when topology or dispositions change.

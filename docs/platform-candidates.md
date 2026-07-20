@@ -57,13 +57,13 @@ Common next AWS (or AWS-adjacent) capabilities. Default question: **pin AWS**, *
 |-------------------|-----------------|----------------------------|--------|------------------|
 | DNS | Route 53 | ExternalDNS + external DNS; CoreDNS only in-cluster | `candidate` | |
 | Public TLS certificates | ACM | cert-manager + public CA / Let’s Encrypt | `candidate` | |
-| Encryption keys / CMKs | KMS | OpenBao transit; limited substitute for AWS data-plane keys | `candidate` | Often **hybrid**: KMS for AWS resources, OpenBao for app secrets |
+| Encryption keys / CMKs | KMS | OpenBao transit; limited substitute for AWS data-plane keys | `hybrid` | **2026-07-20:** KMS CMK for EKS secrets (`aws_eks/kms` + CAPA `encryptionConfig`); OpenBao remains app secrets SoR |
 | Managed secrets (cloud) | Secrets Manager / SSM Parameter Store | OpenBao + External Secrets | `candidate` | ESO can multi-store; prefer one SoR story |
-| Cloud metrics/logs (AWS native) | CloudWatch | OTel → LGTM only | `candidate` | EKS control-plane logs may still want CloudWatch |
+| Cloud metrics/logs (AWS native) | CloudWatch | OTel → LGTM only | `hybrid` | **2026-07-20:** EKS CP logs (all five) → CloudWatch via CAPA; app/telemetry still OTel → LGTM target |
 | Container registry (AWS) | ECR | Harbor (committed OSS) pull-through to ECR | `candidate` | Likely **hybrid** if Harbor proxies ECR |
 | L4/L7 load balancing | NLB / ALB (+ AWS LB Controller) | MetalLB / ingress-nginx only (limited on EKS) | `candidate` | EKS almost always pins AWS LBs |
 | Private service access | VPC endpoints / PrivateLink | NAT only (cost/ops tradeoff) | `candidate` | |
-| Pod → AWS identity | IRSA / EKS Pod Identity | Node instance role only (weaker) | `candidate` | Strongly prefer pin for least privilege |
+| Pod → AWS identity | IRSA / EKS Pod Identity | Node instance role only (weaker) | `candidate` | **Partial:** `associateOIDCProvider: true` on CAPA EKS; pin IRSA/Pod Identity per service when Services land |
 | Image scanning (AWS) | ECR scanning / Inspector | Harbor scanning (already in Services) | `candidate` | |
 | WAF / edge protection | WAF, CloudFront | In-cluster only (weaker for public edge) | `candidate` | |
 | Backup for AWS resources | AWS Backup | Velero (elected OSS; often **hybrid** with S3) | `hybrid` | Velero on Workload+Services; S3 already pinned |
@@ -134,6 +134,9 @@ Move candidates here with a date and reason. Reopen only with a new need stateme
 | 2026-07-17 | Velero | elected-oss | Workload + Services; often S3 target |
 | 2026-07-17 | Karpenter | elected-oss | Services plane node autoscaling |
 | 2026-07-17 | Argo CD, Keycloak, OAuth2 Proxy, Harbor, CNPG, OTel, LGTM | elected-oss | Services plane (see ARCHITECTURE) |
+| 2026-07-20 | KMS CMK (EKS secrets) | hybrid | CAPA encryptionConfig + `aws_eks/kms`; OpenBao for app secrets |
+| 2026-07-20 | CloudWatch (EKS CP logs) | hybrid | CAPA logging all five; LGTM still target for app telemetry |
+| 2026-07-20 | IRSA foundation | candidate (partial) | OIDC associated on CAPA EKS; per-service roles later |
 
 ---
 

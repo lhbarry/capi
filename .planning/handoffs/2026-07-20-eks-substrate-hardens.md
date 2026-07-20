@@ -1,70 +1,98 @@
 # Handoff: EKS substrate hardens (dev mode)
 
 **Date:** 2026-07-20  
-**Repo:** `capi` (`main` local work — **do not push** while Flux would apply AWS)  
-**Mode:** Development — templates and CAPA YAML only; no AWS apply from this session.
+**Repo:** `capi`  
+**Mode:** Development — **do not `git push`** (Flux on Kind tracks `main` → AWS path when resources enabled).  
+**Local commit:** `c88ec56` — *Harden EKS CAPA substrate for WA lab posture (local only)*  
+**Branch:** `main` ahead of `origin/main` by ≥1 (push only when AWS create is intentional).
 
 ---
 
 ## Constraints (carry forward)
 
-1. **No git push** while `aws_eks/clusters` could provision (or until `resources: []` stays empty on remote).  
+1. **No git push** until you intend cloud changes (or confirm remote still has `resources: []`).  
 2. **No AWS deploys** of new stacks until intentionally leaving pure-dev.  
-3. Flux path `aws-eks-clusters` tracks `./aws_eks/clusters` — empty `resources` = no cluster CRs.
+3. Flux `aws-eks-clusters` → `./aws_eks/clusters` — keep **`resources: []`**.
 
 ---
 
-## Done this session (local)
+## Done
 
-### WA Do-first substrate hardens in `aws_eks/clusters/capi-eks-1.yaml`
+### WA Do-first in `aws_eks/clusters/capi-eks-1.yaml`
 
 | Control | Implementation |
 |---------|----------------|
 | CP logging | All five → CloudWatch |
-| Endpoint | `private: true`, `public: true`, `publicCIDRs` via kustomize |
-| Encryption | `encryptionConfig` → `alias/cluster-api-provider-aws-eks-secrets` |
+| Endpoint | Private + public + `publicCIDRs` (kustomize) |
+| Encryption | `alias/cluster-api-provider-aws-eks-secrets` |
 | OIDC | `associateOIDCProvider: true` |
-| SSH / bastion | `sshKeyName: ""`, bastion off; workers `publicIP: false` |
+| SSH / bastion | Empty keys; bastion off; workers `publicIP: false` |
 | Tags | Project / Environment / CostCenter / ManagedBy |
-| AL2023 bootstrap | `cloudInit.insecureSkipSecretsManager: true` |
+| AL2023 | `insecureSkipSecretsManager: true` |
 
 ### Supporting templates (not deployed)
 
 | Path | Purpose |
 |------|---------|
-| `aws_eks/kms/eks-secrets-cmk.yaml` | CMK + alias for secrets encryption |
-| `aws_cost/lab-budget.yaml` | Monthly budget (optional email) |
-| `aws_iam/ec2-self-managed.yaml` | Node role + `AmazonSSMManagedInstanceCore` |
+| `aws_eks/kms/` | CMK + alias for secrets encryption |
+| `aws_cost/` | Monthly budget CFN |
+| `aws_iam/ec2-self-managed.yaml` | Node SSM managed policy (live stack not updated) |
 
-### Docs
+### Docs / candidates
 
-- `ARCHITECTURE.md` §6 knobs + §8 lab/prod matrix  
-- `aws_eks/**/README`, `aws_iam/README`, root `README`  
-- kustomize: dropped SSH param; added `PUBLIC_API_CIDR`  
-- **`resources: []` unchanged** (safe)
-
----
-
-## Live environment (unchanged intent)
-
-| Component | Status (last known) |
-|-----------|---------------------|
-| Kind `capi-mgmt` | Up (lab mgmt experimental) |
-| IAM stacks `capa-iam-{common,ec2,eks}` | CREATE_COMPLETE |
-| EKS workload cluster | None (Flux resources empty) |
-| New CMK / budget stacks | **Not deployed** |
+- `ARCHITECTURE.md` §6, §8, §12 evolution  
+- Platform candidates: KMS + CloudWatch → `hybrid`; IRSA foundation noted  
+- Server dry-run against Kind CRDs passed  
 
 ---
 
-## Next session options
+## Live environment
 
-1. Local review / dry-run kustomize of hardened YAML (no push).  
-2. When ready for AWS: deploy KMS → (optional budget) → set `PUBLIC_API_CIDR` → enable resources → push.  
-3. Continue WA: Services plane design, management decision, or pillar deep-dive.  
-4. Commit locally only if desired — **still no push** until AWS create is intentional.
+| Component | Status |
+|-----------|--------|
+| Kind `capi-mgmt` | Experimental lab mgmt (up) |
+| IAM `capa-iam-{common,ec2,eks}` | CREATE_COMPLETE (SSM policy not yet redeployed) |
+| EKS cluster | None (`resources: []`) |
+| CMK / budget stacks | Not deployed |
+| Git | Local commit only; **not pushed** |
 
 ---
 
-## Prior handoff
+## Next (pick one)
 
-`.planning/handoffs/2026-07-13-aws-eks-next.md` — IAM split + EKS scaffold (mostly complete; superseded for “what’s next”).
+### A — Stay pure-dev (recommended until ready for $)
+
+1. Local CI-ish checks (kubeconform / kustomize script) without Flux enable.  
+2. Architecture: decide **management plane**, or disposition more `platform-candidates`.  
+3. Design-only Services plane (Argo CD) manifests under a non-Flux path or still-empty kustomize.  
+4. Pillar deep-dive `/security-assessment` or re-score after hardens.
+
+### B — Leave pure-dev (creates AWS when done end-to-end)
+
+1. Deploy `aws_eks/kms` CMK.  
+2. Redeploy `capa-iam-ec2` (SSM on nodes).  
+3. Optional `aws_cost` budget + email.  
+4. Set real `PUBLIC_API_CIDR` in kustomization.  
+5. `resources: [capi-eks-1.yaml]` → commit → **push** (Flux creates EKS).
+
+---
+
+## WA score delta (lab, code-as-evidence)
+
+| | Before hardens | After (YAML committed, not live) |
+|--|----------------|----------------------------------|
+| Overall | ~2.1 | **~2.6–2.8** (design+YAML; live still lacks CMK deploy) |
+| SEC | 1.5 | **~2.3** (logging/encrypt/endpoint/SSH explicit) |
+| COST | 2.5 | **~2.8** (tags + budget template) |
+| OPS | 2.5 | **~2.7** (documented knobs + candidates) |
+
+Larger jump (~3.0+) needs: live CMK, Services/Argo, IRSA per service, backups, mgmt decision.
+
+---
+
+## Safety checklist before any push
+
+- [ ] `aws_eks/clusters/kustomization.yaml` has `resources: []` **or** you accept EKS create  
+- [ ] `PUBLIC_API_CIDR` is a real `/32` (not `YOUR_PUBLIC_IP/32` or `0.0.0.0/0`)  
+- [ ] CMK stack exists if encryptionConfig is enabled  
+- [ ] Cost floor understood (2 NAT + EKS + worker + CloudWatch logs)

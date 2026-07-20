@@ -26,6 +26,14 @@ Declarative CAPA manifests for **EKS managed control plane** (+ EC2 workers in c
 | `clusters/capi-eks-1.yaml` | Lab EKS cluster + substrate hardens |
 | `kms/` | CMK for EKS secrets encryption (CLI CFN; not Flux) |
 
+## Local validation (no AWS, no Flux apply)
+
+```bash
+./scripts/validate-eks-manifests.sh
+```
+
+Builds CAPA YAML in a temp dir, checks harden markers, optional server dry-run, asserts repo `resources: []`.
+
 ## Parallel path
 
 EC2 self-managed: [`aws_ec2/`](../aws_ec2/) — secondary; will mirror this model later.
