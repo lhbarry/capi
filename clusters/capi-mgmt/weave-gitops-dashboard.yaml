@@ -25,6 +25,8 @@ metadata:
   namespace: flux-system
 spec:
   interval: 1h0m0s
+  # CD DISABLED with rest of Flux pure-dev posture
+  suspend: true
   chart:
     spec:
       chart: weave-gitops
